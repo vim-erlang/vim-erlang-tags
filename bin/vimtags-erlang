@@ -1,0 +1,338 @@
+#!/usr/bin/env escript
+
+%%% Recommended reading:
+%%%
+%%% - http://ctags.sourceforge.net/FORMAT
+%%% - http://vimdoc.sourceforge.net/htmldoc/tagsrch.html#tags-file-format
+
+%%% The Tags ets table has the following scheme:
+%%%
+%%%     {{TagName, FilePath}, {TagAddress, Scope, Kind}}
+%%%
+%%% Or in more readable notation:
+%%%
+%%%     {TagName, FilePath} -> {TagAddress, Scope, Kind}
+%%%
+%%% Examples of entries (and the tags output generated from them):
+%%%
+%%%     {ErlFileName, FilePath} -> {TagAddress, global, $F}
+%%%     
+%%%         myfile.erl  ./myfile.erl  1;"  F
+%%%     
+%%%     {HrlFileName, FilePath} -> {TagAddress, global, $F}
+%%%     
+%%%         myfile.hrl  ./myfile.hrl  1;"  F
+%%%     
+%%%     {ModName, FilePath} -> {TagAddress, global, $M}
+%%%     
+%%%         myfile  ./myfile.erl  1;"  M
+%%%     
+%%%     {FuncName, FilePath} -> {TagAddress, local, $f}
+%%%     
+%%%         f  ./mymod.erl  /^f\>/;"  f  file:
+%%%     
+%%%     {FuncName, FilePath} -> {TagAddress, global, $f}
+%%%     
+%%%         mymod:f  ./mymod.erl  /^f\>/;"  f
+%%%
+%%%     {Record, FilePath} -> {TagAddress, local, $r}
+%%%
+%%%         myrec  ./mymod.erl  /^-record\.\*\<myrec\>/;"  r  file:
+%%%     
+%%%     {Record, FilePath} -> {TagAddress, global, $r}
+%%%
+%%%         myrec  ./myhrl.hrl  /^-record\.\*\<myrec\>/;"  r
+%%%
+%%%     {Macro, FilePath} -> {TagAddress, local, $d}
+%%%
+%%%         mymac  ./mymod.erl  /^-record\.\*\<myrec\>/;"  d  file:
+%%%     
+%%%     {Macro, FilePath} -> {TagAddress, global, $d}
+%%%
+%%%         mymac  ./myhrl.hrl  /^-record\.\*\<myrec\>/;"  d
+
+main(Args) ->
+    put(tagsfilename, "tags"),
+    parse_args(Args),
+    Tags = create_tags(),
+    tags_to_file(Tags, get(tagsfilename)),
+    ets:delete(Tags).
+
+parse_args([]) ->
+    ok;
+parse_args(["-"|OtherArgs]) ->
+    put(stdin, true), % Not nice, I know...
+    parse_args(OtherArgs);
+parse_args([Help|_]) when Help == "-h";
+                          Help == "--help" ->
+    print_help(),
+    halt(0);
+parse_args([Verbose|OtherArgs]) when Verbose == "-v";
+                                     Verbose == "--verbose" ->
+    put(verbose, true), % Not nice, I know...
+    log("Verbose mode on.~n"),
+    parse_args(OtherArgs);
+parse_args([Output, TagsFileName|OtherArgs]) when Output == "-o";
+                                                  Output == "--output" ->
+    put(tagsfilename, TagsFileName), % Not nice, I know...
+    parse_args(OtherArgs);
+parse_args([Output]) when Output == "-o";
+                          Output == "--output" ->
+    log_error("More argument needed after ~s.~n", [Output]),
+    halt(1);
+parse_args([Arg|_]) ->
+    log_error("Unknown argument: ~s~n", [Arg]),
+    halt(1).
+
+print_help() ->
+    Help =
+"Usage: vimtags-erlang [-h|--help] [-v|--verbose] [-] [-o|--output FILE]
+
+Description:
+  vimtags-erlang creates a tags file that can be used by vim.
+  
+Options:
+  -h, --help    Print help and exit.
+  -v, --verbose Verbose output.
+  -             Read the list of files from the standard input.
+  -o, --output FILE
+                Write the output into the given file instead of ./tags.
+
+Example:
+  $ vimtags-erlang
+  $ find . -name '*.[he]rl' | vimtags-erlang -  # equivalent with the above
+",
+    io:format("~s", [Help]).
+
+%%%=============================================================================
+%%% Create tags from directory trees and file lists
+%%%=============================================================================
+
+% Read the given Erlang source files and return an ets table that contains the
+% appropriate tags.
+create_tags() ->
+    Tags = ets:new(tags, [ordered_set]),
+    log("Tags table created.~n"),
+
+    case get(stdin) of
+        true ->
+            process_filenames_from_stdin(Tags);
+        _ ->
+            process_dir_tree(".", Tags)
+    end,
+
+    Tags.
+      
+% Read file names for stdin and scan the files for tags.
+process_filenames_from_stdin(Tags) ->
+    case io:get_line(standard_io, "") of
+        eof ->
+            ok;
+        Line ->
+            File = trim(Line),
+            log("File to process: ~s~n", [File]),
+            add_tags_from_file(File, Tags),
+            process_filenames_from_stdin(Tags)
+    end.
+
+% Traverse the given directory and scan the Erlang files inside for tags.
+process_dir_tree(Top, Tags) ->
+    case file:list_dir(Top) of
+        {ok, FileNames} ->
+            RelFileNames = [filename:join(Top, FileName) ||
+                            FileName <- FileNames],
+            process_filenames(RelFileNames, Tags);
+        eacces ->
+            log_error("Permission denied: ~s~n", [Top]);
+        enoent ->
+            log_error("Directory does not exist: ~s~n", [Top])
+    end.
+
+% Go through the given files: scan the Erlang files for tags and traverse the
+% directories for further Erlang files.
+process_filenames([], _Tags) ->
+    ok;
+process_filenames([File|OtherFiles], Tags) ->
+    case filelib:is_dir(File) of
+        true ->
+            process_dir_tree(File, Tags);
+        false ->
+            case filename:extension(File) of
+                Ext when Ext == ".erl";
+                         Ext == ".hrl" ->
+                    add_tags_from_file(File, Tags);
+                _ ->
+                    ok
+            end
+    end,
+    process_filenames(OtherFiles, Tags).
+
+%%%=============================================================================
+%%% Scan a file or line for tags
+%%%=============================================================================
+
+% Read the given Erlang source file and add the appropriate tags to the Tags ets
+% table.
+add_tags_from_file(File, Tags) ->
+    log("~nProcessing file: ~s~n", [File]),
+
+    BaseName = filename:basename(File), % e.g. "mymod.erl"
+    ModName = filename:rootname(BaseName), % e.g. "mymod"
+    add_file_tag(Tags, File, BaseName, ModName),
+
+    {ok, Fd} = file:open(File, [read]),
+    add_tags_from_fd(Fd, File, ModName, Tags),
+    file:close(Fd).
+
+% Read text from the given file descriptor and add the appropriate tags to the
+% Tags ets table.
+add_tags_from_fd(Fd, File, ModName, Tags) ->
+    case file:read_line(Fd) of
+        eof ->
+            ok;
+        {ok, Line} ->
+            add_tags_from_line(Line, File, ModName, Tags),
+            add_tags_from_fd(Fd, File, ModName, Tags)
+    end.
+
+% Process an Erlang source line by adding tags to the Tags ets table if
+% appropriate.
+add_tags_from_line(Line, File, ModName, Tags) ->
+
+    % Function definition
+    case re:run(Line,
+                "^([a-z][a-zA-Z0-9_@]*)\\s*\\(",
+                [{capture, all, list}]) of
+        nomatch ->
+            ok;
+        {match, [_, FuncName]} ->
+            add_func_tags(Tags, File, ModName, FuncName)
+    end,
+
+    % Record or macro definition
+    case re:run(Line,
+                "^-\\s*(record|define)\\s*\\(\\s*([a-zA-Z0-9_@]*)\\b",
+                [{capture, all, list}]) of
+        nomatch ->
+            ok;
+        {match, [_, Attribute, Name]} ->
+            add_record_or_macro_tag(Tags, File, Attribute, Name)
+    end.
+
+%%%=============================================================================
+%%% Add specific tags
+%%%=============================================================================
+
+% Add this information to Tags.
+add_file_tag(Tags, File, BaseName, ModName) ->
+
+    % myfile.hrl <tab> ./myfile.hrl <tab> 1;"  F
+    % myfile.erl <tab> ./myfile.erl <tab> 1;"  F
+    % myfile <tab> ./myfile.erl <tab> 1;"  M
+    add_tag(Tags, BaseName, File, "1", global, $F),
+
+    case filename:extension(File) of
+        ".erl" ->
+            add_tag(Tags, ModName, File, "1", global, $M);
+        _ ->
+            ok
+    end.
+
+% File contains the function ModName:FuncName; add this information to Tags.
+add_func_tags(Tags, File, ModName, FuncName) ->
+
+    log("Function definition found: ~s~n", [FuncName]),
+
+    % Global entry:
+    % mymod:f <tab> ./mymod.erl <tab> /^f\>/
+    add_tag(Tags, ModName ++ ":" ++ FuncName, File, "/^" ++ FuncName ++ "\\>/",
+            global, $f),
+
+    % Static (or local) entry:
+    % f <tab> ./mymod.erl <tab> /^f\>/ <space><space> ;" <tab> file:
+    add_tag(Tags, FuncName, File, "/^" ++ FuncName ++ "\\>/", local, $f).
+
+% File contains a macro or record called Name; add this information to Tags.
+add_record_or_macro_tag(Tags, File, Attribute, Name) ->
+
+    Kind =
+        case Attribute of
+            "record" ->
+                log("Record found: ~s~n", [Name]),
+                $r;
+            "define" ->
+                log("Macro found: ~s~n", [Name]),
+                $d
+        end,
+
+    Scope =
+        case filename:extension(File) of
+            ".hrl" ->
+                global;
+            _ ->
+                local
+        end,
+
+    % myrec  ./mymod.erl  /^-record\.\*\<myrec\>/;"  r  file:
+    % myrec  ./myhrl.hrl  /^-record\.\*\<myrec\>/;"  r
+    % myrec  ./mymod.erl  /^-define\.\*\<mymac\>/;"  m  file:
+    % myrec  ./myhrl.hrl  /^-define\.\*\<mymac\>/;"  m
+    add_tag(Tags, Name, File,
+            ("/^-\\s\\*" ++ Attribute ++ "\\s\\*(\\s\\*" ++ Name ++ "\\>/"),
+            Scope, Kind).
+
+add_tag(Tags, Tag, File, TagAddress, Scope, Kind) ->
+    ets:insert_new(Tags, {{Tag, File}, {TagAddress, Scope, Kind}}).
+
+%%%=============================================================================
+%%% Writing tags into a file
+%%%=============================================================================
+
+tags_to_file(Tags, TagsFile) ->
+    {ok, Fd} = file:open(TagsFile, [write]),
+    ets:foldl(
+      fun(Tag, _) ->
+              Line = tag_to_string(Tag),
+              file:write(Fd, [Line, $\n])
+      end, acc, Tags),
+    file:close(TagsFile).
+
+tag_to_string({{Tag, File}, {TagAddress, Scope, Kind}}) ->
+    ScopeStr =
+        case Scope of
+            global ->
+                "";
+            local ->
+                "\tfile:"
+        end,
+
+    [Tag, "\t",
+     File, "\t",
+     TagAddress, ";\"\t",
+     Kind,
+     ScopeStr].
+
+%%%=============================================================================
+%%% Utility functions
+%%%=============================================================================
+
+% From http://www.trapexit.org/Trimming_Blanks_from_String
+trim(Input) ->
+    re:replace(Input, "\\s*$", "", [{return, list}]).
+
+log(Format) ->
+    log(Format, []).
+
+log(Format, Data) ->
+    case get(verbose) of
+        true ->
+            io:format(Format, Data);
+        _ ->
+            ok
+    end.
+
+%log_error(Format) ->
+%    log_error(Format, []).
+
+log_error(Format, Data) ->
+    io:format(standard_error, Format, Data).
