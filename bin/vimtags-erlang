@@ -333,6 +333,7 @@ add_tag(Tags, Tag, File, TagAddress, Scope, Kind) ->
 
 tags_to_file(Tags, TagsFile) ->
     {ok, Fd} = file:open(TagsFile, [write]),
+    file:write(Fd, "!_TAG_FILE_SORTED\t1\t/0=unsorted, 1=sorted/~n"),
     ets:foldl(
       fun(Tag, _) ->
               Line = tag_to_string(Tag),
