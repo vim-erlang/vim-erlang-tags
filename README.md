@@ -54,7 +54,7 @@ Add the following line to your `.vimrc`:
 
     :set tags^=./tags,tags
 
-This will make Vim to search for the `tags` file in the current buffer's
+This will make Vim search for the `tags` file in the current buffer's
 directory, or, if not found there, current working directory.
 
 Reopen Vim or just execute `:source $MYVIMRC` – now all your function names,
