@@ -57,6 +57,12 @@ Add the following line to your `.vimrc`:
 This will make Vim search for the `tags` file in the current buffer's
 directory, or, if not found there, current working directory.
 
+Dependning on your workflow you may want to add the following line:
+
+    :set tags^=/path/to/my_erlang_project/tags
+
+This will explicitly add the `tags` file to the list of known tags locations.
+
 Reopen Vim or just execute `:source $MYVIMRC` – now all your function names,
 records, macros and file names are available with the Vim tag commands. For
 more information on those commands, see `:help tagsrch.txt`.
