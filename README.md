@@ -51,7 +51,7 @@ You can either do that from the command line:
 
 Or you can do that from within Vim by executing the following command:
 
-    :ErlangVimtags
+    :ErlangTags
 
 Note that for the latter command, the current working directory will be used
 (`:help pwd` to find out more).
