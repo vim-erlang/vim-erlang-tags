@@ -12,7 +12,26 @@
 " See the License for the specific language governing permissions and
 " limitations under the License.
 
+if exists("b:vimtags_erlang_loaded")
+    finish
+else
+    let b:vimtags_erlang_loaded = 1
+endif
+
 autocmd FileType erlang call VimTagsErlangDefineMappings()
+
+let s:exec_script = expand('<sfile>:p:h') . "/../bin/vimtags-erlang"
+
+function! VimtagsErlang()
+    let script_output = system(s:exec_script)
+    if !v:shell_error
+        return 0
+    else
+        echoerr "vimtags-erlang: " . script_output
+    endif
+endfunction
+
+command! ErlangVimtags call VimtagsErlang()
 
 function! VimtagsErlangSelect()
     let orig_isk = &isk
