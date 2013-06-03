@@ -1,7 +1,10 @@
-vimtags-erlang
-==============
+vim-erlang-tags
+===============
 
-`vimtags-erlang` **creates a tags file** (from Erlang source files), which can
+The idea
+--------
+
+`vim-erlang-tags` **creates a tags file** (from Erlang source files), which can
 be used by Vim.
 
 When using Exuberant ctags or etags, the genereted tags will contain function
@@ -37,32 +40,41 @@ Usage
 
 Let's say you would like to use tags for your Erlang project.
 
-Generate the tags (you have to do this periodically to keep the tags file
-up-to-date):
+### Generate tags
+
+First you need to generate the tags.
+
+You can either do that from the command line:
 
     $ cd /path/to/my_erlang_project
     $ /path/to/vimtags-erlang/vimtags-erlang
 
-or, within Vim execute the following command:
+Or you can do that from within Vim by executing the following command:
 
     :ErlangVimtags
 
-Note, that for the command above, the current working directory will be used
+Note that for the latter command, the current working directory will be used
 (`:help pwd` to find out more).
 
+To keep the tags file up-to-date you can re-run these commands periodically, or
+automatize the process by creating a crontab entry or a commit hook.
+
+### Make Vim use the tags
+
 Add the following line to your `.vimrc`:
-
-    :set tags^=./tags,tags
-
-This will make Vim search for the `tags` file in the current buffer's
-directory, or, if not found there, current working directory.
-
-Dependning on your workflow you may want to add the following line:
 
     :set tags^=/path/to/my_erlang_project/tags
 
 This will explicitly add the `tags` file to the list of known tags locations.
 
 Reopen Vim or just execute `:source $MYVIMRC` – now all your function names,
-records, macros and file names are available with the Vim tag commands. For
-more information on those commands, see `:help tagsrch.txt`.
+records, macros and file names are available with the Vim tag search commands.
+
+### Using the Vim tag search commands
+
+The few most useful tag search commands are the following:
+
+- `CTRL-]`: jump to the definition of the function/record/macro under the cursor
+- `:tj ident`: jump to the definition of `ident` (function/record/macro name)
+
+For more information on those commands, see `:help tagsrch.txt`.
