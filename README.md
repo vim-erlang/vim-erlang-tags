@@ -28,7 +28,6 @@ Installation
 ------------
 
 - Clone this repository.
-- Make sure the `bin/vimtags-erlang` is executable and add it to the `PATH`.
 - Add the following line to your `.vimrc` (replace the path with your own):
 
         :set runtimepath^=/path/to/vimtags-erlang
@@ -42,12 +41,21 @@ Generate the tags (you have to do this periodically to keep the tags file
 up-to-date):
 
     $ cd /path/to/my_erlang_project
-    $ vimtags-erlang
+    $ /path/to/vimtags-erlang/vimtags-erlang
 
-Add the following line to your `.vimrc` (this add the tags file to the list of
-known tags files):
+or, within Vim execute the following command:
 
-    :set tags^=/path/to/my_erlang_project/tags
+    :ErlangVimtags
+
+Note, that for the command above, the current working directory will be used
+(`:help pwd` to find out more).
+
+Add the following line to your `.vimrc`:
+
+    :set tags^=./tags,tags
+
+This will make Vim to search for the `tags` file in the current buffer's
+directory, or, if not found there, current working directory.
 
 Reopen Vim or just execute `:source $MYVIMRC` – now all your function names,
 records, macros and file names are available with the Vim tag commands. For
