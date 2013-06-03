@@ -66,16 +66,28 @@
 %%%         mymac  ./myhrl.hrl  /^-record\.\*\<myrec\>/;"  d
 
 main(Args) ->
+
+    % Process arguments
+    put(files, []),
     put(tagsfilename, "tags"),
     parse_args(Args),
-    Tags = create_tags(),
+    Files =
+        case get(files) of
+            [] ->
+                ["."];
+            Other ->
+                Other
+        end,
+
+    Tags = create_tags(Files),
     tags_to_file(Tags, get(tagsfilename)),
     ets:delete(Tags).
 
+%% I know that using the process dictionary is not very nice...
 parse_args([]) ->
     ok;
 parse_args(["-"|OtherArgs]) ->
-    put(stdin, true), % Not nice, I know...
+    put(files, [stdin|get(files)]),
     parse_args(OtherArgs);
 parse_args([Help|_]) when Help == "-h";
                           Help == "--help" ->
@@ -83,27 +95,34 @@ parse_args([Help|_]) when Help == "-h";
     halt(0);
 parse_args([Verbose|OtherArgs]) when Verbose == "-v";
                                      Verbose == "--verbose" ->
-    put(verbose, true), % Not nice, I know...
+    put(verbose, true),
     log("Verbose mode on.~n"),
     parse_args(OtherArgs);
 parse_args([Output, TagsFileName|OtherArgs]) when Output == "-o";
                                                   Output == "--output" ->
-    put(tagsfilename, TagsFileName), % Not nice, I know...
+    put(tagsfilename, TagsFileName),
     parse_args(OtherArgs);
 parse_args([Output]) when Output == "-o";
                           Output == "--output" ->
     log_error("More argument needed after ~s.~n", [Output]),
     halt(1);
-parse_args([Arg|_]) ->
+parse_args(["-" ++ Arg|_]) ->
     log_error("Unknown argument: ~s~n", [Arg]),
-    halt(1).
+    halt(1);
+parse_args([FileName|OtherArgs]) ->
+    put(files, [FileName|get(files)]),
+    parse_args(OtherArgs).
 
 print_help() ->
     Help =
 "Usage: vimtags-erlang [-h|--help] [-v|--verbose] [-] [-o|--output FILE]
+                       DIR_OR_FILE...
 
 Description:
-  vimtags-erlang creates a tags file that can be used by vim.
+  vimtags-erlang creates a tags file that can be used by Vim. The directories
+  given as arguments are searched (recursively) for *.erl and *.hrl files,
+  which will be scanned. The files given as arguments are also scanned. The
+  default is to search in the current directory.
   
 Options:
   -h, --help    Print help and exit.
@@ -114,7 +133,9 @@ Options:
 
 Example:
   $ vimtags-erlang
-  $ find . -name '*.[he]rl' | vimtags-erlang -  # equivalent with the above
+  $ vimtags-erlang .  # Same
+  $ find . -name '*.[he]rl' | vimtags-erlang -  # Equivalent to the above
+  $ vimtags-erlang /path/to/project1 /path/to/project2
 ",
     io:format("~s", [Help]).
 
@@ -124,16 +145,24 @@ Example:
 
 % Read the given Erlang source files and return an ets table that contains the
 % appropriate tags.
-create_tags() ->
+create_tags(Files) ->
     Tags = ets:new(tags, [ordered_set]),
     log("Tags table created.~n"),
 
-    case get(stdin) of
-        true ->
-            process_filenames_from_stdin(Tags);
+    {StdIn, RealFiles} =
+        lists:partition(
+          fun(stdin) -> true;
+             (_) -> false
+          end, Files),
+
+    case StdIn of
+        [] ->
+            ok;
         _ ->
-            process_dir_tree(".", Tags)
+            process_filenames_from_stdin(Tags)
     end,
+
+    process_filenames(RealFiles, Tags),
 
     Tags.
       
