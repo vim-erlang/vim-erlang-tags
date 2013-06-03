@@ -1,4 +1,5 @@
 " Copyright 2013 Csaba Hoch
+" Copyright 2013 Adam Rutkowski
 "
 " Licensed under the Apache License, Version 2.0 (the "License");
 " you may not use this file except in compliance with the License.
@@ -12,38 +13,38 @@
 " See the License for the specific language governing permissions and
 " limitations under the License.
 
-if exists("b:vimtags_erlang_loaded")
+if exists("b:vim_erlang_tags_loaded")
     finish
 else
-    let b:vimtags_erlang_loaded = 1
+    let b:vim_erlang_tags_loaded = 1
 endif
 
-autocmd FileType erlang call VimTagsErlangDefineMappings()
+autocmd FileType erlang call VimErlangTagsDefineMappings()
 
-let s:exec_script = expand('<sfile>:p:h') . "/../bin/vimtags-erlang"
+let s:exec_script = expand('<sfile>:p:h') . "/../bin/vim-erlang-tags"
 
-function! VimtagsErlang()
+function! VimErlangTags()
     let script_output = system(s:exec_script)
     if !v:shell_error
         return 0
     else
-        echoerr "vimtags-erlang: " . script_output
+        echoerr "vim-erlang-tags: " . script_output
     endif
 endfunction
 
-command! ErlangVimtags call VimtagsErlang()
+command! ErlangTags call VimErlangTags()
 
-function! VimtagsErlangSelect()
+function! VimErlangTagsSelect()
     let orig_isk = &isk
     set isk+=:
     normal "_vaw
     let &isk = orig_isk
 endfunction
 
-function! VimTagsErlangDefineMappings()
-    nnoremap <buffer> <c-]>         :call VimtagsErlangSelect()<cr><c-]>
-    nnoremap <buffer> g<LeftMouse>  :call VimtagsErlangSelect()<cr>g<LeftMouse>
-    nnoremap <buffer> <c-LeftMouse> :call VimtagsErlangSelect()<cr><c-LeftMouse>
-    nnoremap <buffer> g]            :call VimtagsErlangSelect()<cr>g]
-    nnoremap <buffer> g<c-]>        :call VimtagsErlangSelect()<cr>g<c-]>
+function! VimErlangTagsDefineMappings()
+    nnoremap <buffer> <c-]>         :call VimErlangTagsSelect()<cr><c-]>
+    nnoremap <buffer> g<LeftMouse>  :call VimErlangTagsSelect()<cr>g<LeftMouse>
+    nnoremap <buffer> <c-LeftMouse> :call VimErlangTagsSelect()<cr><c-LeftMouse>
+    nnoremap <buffer> g]            :call VimErlangTagsSelect()<cr>g]
+    nnoremap <buffer> g<c-]>        :call VimErlangTagsSelect()<cr>g<c-]>
 endfunction
