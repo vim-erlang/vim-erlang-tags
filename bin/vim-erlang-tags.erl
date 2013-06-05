@@ -144,10 +144,10 @@ Options:
                 Write the output into the given file instead of ./tags.
 
 Example:
-  $ vimtags-erlang
-  $ vimtags-erlang .  # Same
-  $ find . -name '*.[he]rl' | vimtags-erlang -  # Equivalent to the above
-  $ vimtags-erlang /path/to/project1 /path/to/project2
+  $ vim-erlang-tags.erl
+  $ vim-erlang-tags.erl .  # Same
+  $ find . -name '*.[he]rl' | vim-erlang-tags.erl -  # Equivalent to the above
+  $ vim-erlang-tags.erl /path/to/project1 /path/to/project2
 ",
     io:format("~s", [Help]).
 
