@@ -1,6 +1,9 @@
 #!/usr/bin/env escript
+%% -*- tab-width: 4;erlang-indent-level: 4;indent-tabs-mode: nil -*-
+%% ex: ts=4 sw=4 ft=erlang et
 
 %%% Copyright 2013 Csaba Hoch
+%%% Copyright 2013 Adam Rutkowski
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
@@ -21,52 +24,61 @@
 
 %%% The Tags ets table has the following scheme:
 %%%
-%%%     {{TagName, FilePath}, {TagAddress, Scope, Kind}}
+%%%     {{TagName, FilePath, Kind, Scope}, TagAddress}
 %%%
 %%% Or in more readable notation:
 %%%
-%%%     {TagName, FilePath} -> {TagAddress, Scope, Kind}
+%%%     {TagName, FilePath, Kind, Scope} -> TagAddress
 %%%
 %%% Examples of entries (and the tags output generated from them):
 %%%
-%%%     {ErlFileName, FilePath} -> {TagAddress, global, $F}
+%%%     {ErlFileName, FilePath, global, $F} -> TagAddress
 %%%
 %%%         myfile.erl  ./myfile.erl  1;"  F
 %%%
-%%%     {HrlFileName, FilePath} -> {TagAddress, global, $F}
+%%%     {HrlFileName, FilePath, global, $F} -> TagAddress
 %%%
 %%%         myfile.hrl  ./myfile.hrl  1;"  F
 %%%
-%%%     {ModName, FilePath} -> {TagAddress, global, $M}
+%%%     {ModName, FilePath, global, $M} -> TagAddress
 %%%
 %%%         myfile  ./myfile.erl  1;"  M
 %%%
-%%%     {FuncName, FilePath} -> {TagAddress, local, $f}
+%%%     {FuncName, FilePath, local, $f} -> TagAddress
 %%%
 %%%         f  ./mymod.erl  /^f\>/;"  f  file:
 %%%
-%%%     {FuncName, FilePath} -> {TagAddress, global, $f}
+%%%     {FuncName, FilePath, global, $f} -> TagAddress
 %%%
 %%%         mymod:f  ./mymod.erl  /^f\>/;"  f
 %%%
-%%%     {Record, FilePath} -> {TagAddress, local, $r}
+%%%     {Record, FilePath, local, $r} -> TagAddress
 %%%
 %%%         myrec  ./mymod.erl  /^-record\.\*\<myrec\>/;"  r  file:
 %%%
-%%%     {Record, FilePath} -> {TagAddress, global, $r}
+%%%     {Record, FilePath, global, $r} -> TagAddress
 %%%
 %%%         myrec  ./myhrl.hrl  /^-record\.\*\<myrec\>/;"  r
 %%%
-%%%     {Macro, FilePath} -> {TagAddress, local, $d}
+%%%     {Macro, FilePath, local, $d} -> TagAddress
 %%%
 %%%         mymac  ./mymod.erl  /^-record\.\*\<myrec\>/;"  d  file:
 %%%
-%%%     {Macro, FilePath} -> {TagAddress, global, $d}
+%%%     {Macro, FilePath, global, $d} -> TagAddress
 %%%
 %%%         mymac  ./myhrl.hrl  /^-record\.\*\<myrec\>/;"  d
 
-main(Args) ->
+-mode(compile).
 
+-define(COMPILE, fun(Re) ->
+                         {ok, CRE} = re:compile(Re, [multiline]),
+                         CRE
+                 end).
+
+-define(RE_FUNCTIONS, ?COMPILE("^([^-%\\s][a-z][a-zA-Z0-9_@]*)\\s*\\(")).
+-define(RE_DEFINES,   ?COMPILE("^-\\s*(record|define)\\s*\\(\\s*([a-zA-Z0-9_@]*)\\b")).
+
+main(Args) ->
     % Process arguments
     put(files, []),
     put(tagsfilename, "tags"),
@@ -80,7 +92,7 @@ main(Args) ->
         end,
 
     Tags = create_tags(Files),
-    tags_to_file(Tags, get(tagsfilename)),
+    ok = tags_to_file(Tags, get(tagsfilename)),
     ets:delete(Tags).
 
 %% I know that using the process dictionary is not very nice...
@@ -223,44 +235,25 @@ add_tags_from_file(File, Tags) ->
     ModName = filename:rootname(BaseName), % e.g. "mymod"
     add_file_tag(Tags, File, BaseName, ModName),
 
-    {ok, Fd} = file:open(File, [read]),
-    add_tags_from_fd(Fd, File, ModName, Tags),
-    file:close(Fd).
+    {ok, Contents} = file:read_file(File),
+    ok = scan_tags(Contents, {Tags, File, ModName}).
 
-% Read text from the given file descriptor and add the appropriate tags to the
-% Tags ets table.
-add_tags_from_fd(Fd, File, ModName, Tags) ->
-    case file:read_line(Fd) of
-        eof ->
-            ok;
-        {ok, Line} ->
-            add_tags_from_line(Line, File, ModName, Tags),
-            add_tags_from_fd(Fd, File, ModName, Tags)
-    end.
-
-% Process an Erlang source line by adding tags to the Tags ets table if
-% appropriate.
-add_tags_from_line(Line, File, ModName, Tags) ->
-
-    % Function definition
-    case re:run(Line,
-                "^([a-z][a-zA-Z0-9_@]*)\\s*\\(",
-                [{capture, all, list}]) of
+scan_tags(Contents, {Tags, File, ModName}) ->
+    case re:run(Contents, ?RE_FUNCTIONS, [{capture, all, binary}, global]) of
         nomatch ->
             ok;
-        {match, [_, FuncName]} ->
-            add_func_tags(Tags, File, ModName, FuncName)
+        {match, Matches1} ->
+            [ add_func_tags(Tags, File, ModName, FuncName )
+              || [_, FuncName] <- Matches1 ]
     end,
-
-    % Record or macro definition
-    case re:run(Line,
-                "^-\\s*(record|define)\\s*\\(\\s*([a-zA-Z0-9_@]*)\\b",
-                [{capture, all, list}]) of
+    case re:run(Contents, ?RE_DEFINES, [{capture, all, binary}, global]) of
         nomatch ->
             ok;
-        {match, [_, Attribute, Name]} ->
-            add_record_or_macro_tag(Tags, File, Attribute, Name)
-    end.
+        {match, Matches2} ->
+            [ add_record_or_macro_tag(Tags, File, Attr, Name )
+              || [_, Attr, Name] <- Matches2 ]
+    end,
+    ok.
 
 %%%=============================================================================
 %%% Add specific tags
@@ -288,22 +281,22 @@ add_func_tags(Tags, File, ModName, FuncName) ->
 
     % Global entry:
     % mymod:f <tab> ./mymod.erl <tab> /^f\>/
-    add_tag(Tags, ModName ++ ":" ++ FuncName, File, "/^" ++ FuncName ++ "\\>/",
+    add_tag(Tags, [ModName, ":", FuncName], File, ["/^", FuncName, "\\>/"],
             global, $f),
 
     % Static (or local) entry:
     % f <tab> ./mymod.erl <tab> /^f\>/ <space><space> ;" <tab> file:
-    add_tag(Tags, FuncName, File, "/^" ++ FuncName ++ "\\>/", local, $f).
+    add_tag(Tags, FuncName, File, ["/^", FuncName, "\\>/"], local, $f).
 
 % File contains a macro or record called Name; add this information to Tags.
 add_record_or_macro_tag(Tags, File, Attribute, Name) ->
 
     Kind =
         case Attribute of
-            "record" ->
+            <<"record">> ->
                 log("Record found: ~s~n", [Name]),
                 $r;
-            "define" ->
+            <<"define">> ->
                 log("Macro found: ~s~n", [Name]),
                 $d
         end,
@@ -321,40 +314,35 @@ add_record_or_macro_tag(Tags, File, Attribute, Name) ->
     % myrec  ./mymod.erl  /^-define\.\*\<mymac\>/;"  m  file:
     % myrec  ./myhrl.hrl  /^-define\.\*\<mymac\>/;"  m
     add_tag(Tags, Name, File,
-            ("/^-\\s\\*" ++ Attribute ++ "\\s\\*(\\s\\*" ++ Name ++ "\\>/"),
+            ["/^-\\s\\*", Attribute, "\\s\\*(\\s\\*", Name, "\\>/"],
             Scope, Kind).
 
 add_tag(Tags, Tag, File, TagAddress, Scope, Kind) ->
-    ets:insert_new(Tags, {{Tag, File}, {TagAddress, Scope, Kind}}).
+    ets:insert_new(Tags, {{Tag, File, Kind, Scope}, TagAddress}).
 
 %%%=============================================================================
 %%% Writing tags into a file
 %%%=============================================================================
 
 tags_to_file(Tags, TagsFile) ->
-    {ok, Fd} = file:open(TagsFile, [write]),
-    file:write(Fd, "!_TAG_FILE_SORTED\t1\t/0=unsorted, 1=sorted/\n"),
-    ets:foldl(
-      fun(Tag, _) ->
-              Line = tag_to_string(Tag),
-              file:write(Fd, [Line, $\n])
-      end, acc, Tags),
-    file:close(TagsFile).
+    Header = "!_TAG_FILE_SORTED\t1\t/0=unsorted, 1=sorted/\n",
+    Entries = lists:sort( [ tag_to_binary(Entry) || Entry <- ets:tab2list(Tags) ] ),
+    file:write_file(TagsFile, [Header, Entries]),
+    ok.
 
-tag_to_string({{Tag, File}, {TagAddress, Scope, Kind}}) ->
+tag_to_binary({{Tag, File, Kind, Scope}, TagAddress}) ->
     ScopeStr =
-        case Scope of
-            global ->
-                "";
-            local ->
-                "\tfile:"
-        end,
-
-    [Tag, "\t",
-     File, "\t",
-     TagAddress, ";\"\t",
-     Kind,
-     ScopeStr].
+    case Scope of
+        global ->
+            "";
+        local ->
+            "\tfile:"
+    end,
+    iolist_to_binary( [Tag, "\t",
+                       File, "\t",
+                       TagAddress, ";\"\t",
+                       Kind,
+                       ScopeStr, "\n"]).
 
 %%%=============================================================================
 %%% Utility functions
@@ -380,3 +368,4 @@ log(Format, Data) ->
 
 log_error(Format, Data) ->
     io:format(standard_error, Format, Data).
+
