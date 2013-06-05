@@ -75,7 +75,7 @@
                          CRE
                  end).
 
--define(RE_FUNCTIONS, ?COMPILE("^([^-%\\s][a-z][a-zA-Z0-9_@]*)\\s*\\(")).
+-define(RE_FUNCTIONS, ?COMPILE("^([a-z][a-zA-Z0-9_@]*)\\s*\\(")).
 -define(RE_DEFINES,   ?COMPILE("^-\\s*(record|define)\\s*\\(\\s*([a-zA-Z0-9_@]*)\\b")).
 
 main(Args) ->
