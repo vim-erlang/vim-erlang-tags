@@ -127,14 +127,14 @@ parse_args([FileName|OtherArgs]) ->
 
 print_help() ->
     Help =
-"Usage: vimtags-erlang [-h|--help] [-v|--verbose] [-] [-o|--output FILE]
-                       DIR_OR_FILE...
+"Usage: vim-erlang-tags.erl [-h|--help] [-v|--verbose] [-] [-o|--output FILE]
+                            DIR_OR_FILE...
 
 Description:
-  vimtags-erlang creates a tags file that can be used by Vim. The directories
-  given as arguments are searched (recursively) for *.erl and *.hrl files,
-  which will be scanned. The files given as arguments are also scanned. The
-  default is to search in the current directory.
+  vim-erlang-tags.erl creates a tags file that can be used by Vim. The
+  directories given as arguments are searched (recursively) for *.erl and *.hrl
+  files, which will be scanned. The files given as arguments are also scanned.
+  The default is to search in the current directory.
 
 Options:
   -h, --help    Print help and exit.
