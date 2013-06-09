@@ -53,7 +53,7 @@ First you need to generate the tags.
 You can either do that from the command line:
 
     $ cd /path/to/my_erlang_project
-    $ /path/to/vim-erlang-tags/vim-erlang-tags
+    $ /path/to/vim-erlang-tags/bin/vim-erlang-tags
 
 Or you can do that from within Vim by executing the following command:
 
