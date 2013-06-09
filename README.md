@@ -50,20 +50,29 @@ Let's say you would like to use tags for your Erlang project.
 
 First you need to generate the tags.
 
-You can either do that from the command line:
+You can do that either in the command line:
 
     $ cd /path/to/my_erlang_project
-    $ /path/to/vim-erlang-tags/bin/vim-erlang-tags
+    $ /path/to/vim-erlang-tags/bin/vim-erlang-tags.erl
 
-Or you can do that from within Vim by executing the following command:
+Or within Vim by executing the following command:
 
     :ErlangTags
 
 Note that for the latter command, the current working directory will be used
 (`:help pwd` to find out more).
 
+### Automating generating tags
+
 To keep the tags file up-to-date you can re-run these commands periodically, or
-automatize the process by creating a crontab entry or a commit hook.
+automate the process by creating a commit/checkout hook or a crontab entry.
+
+If you use Git, creating a checkout hook is simple:
+
+    echo '#!/bin/bash' > .git/hooks/post-checkout
+    echo '/path/to/vim-erlang-tags/bin/vim-erlang-tags.erl' > .git/hooks/post-checkout
+    chmod +x .git/hooks/post-checkout
+    cp -i .git/hooks/post-checkout .git/hooks/post-commit
 
 ### Make Vim use the tags
 
