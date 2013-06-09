@@ -30,6 +30,12 @@ jumping to the location of the tag that is under the cursor:
 Installation
 ------------
 
+With [pathogen.vim](https://github.com/tpope/vim-pathogen):
+
+- `cd ~/.vim/bundle` and clone this repository.
+
+Manually:
+
 - Clone this repository.
 - Add the following line to your `.vimrc` (replace the path with your own):
 
