@@ -39,7 +39,7 @@ Manually:
 - Clone this repository.
 - Add the following line to your `.vimrc` (replace the path with your own):
 
-        :set runtimepath^=/path/to/vimtags-erlang
+        :set runtimepath^=/path/to/vim-erlang-tags
 
 Usage
 -----
@@ -53,7 +53,7 @@ First you need to generate the tags.
 You can either do that from the command line:
 
     $ cd /path/to/my_erlang_project
-    $ /path/to/vimtags-erlang/vimtags-erlang
+    $ /path/to/vim-erlang-tags/vim-erlang-tags
 
 Or you can do that from within Vim by executing the following command:
 
