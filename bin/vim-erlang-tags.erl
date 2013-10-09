@@ -82,6 +82,7 @@ main(Args) ->
     % Process arguments
     put(files, []),
     put(tagsfilename, "tags"),
+    put(ignoredir, "_rel"),
     parse_args(Args),
     Files =
         case get(files) of
@@ -118,6 +119,10 @@ parse_args([Output]) when Output == "-o";
                           Output == "--output" ->
     log_error("More argument needed after ~s.~n", [Output]),
     halt(1);
+parse_args([IgnoreDir, DirName|OtherArgs]) when IgnoreDir == "-i";
+                                                 IgnoreDir == "--ignoredir" ->
+    put(ignoredir, DirName),
+    parse_args(OtherArgs);
 parse_args(["-" ++ Arg|_]) ->
     log_error("Unknown argument: ~s~n", [Arg]),
     halt(1);
@@ -192,15 +197,20 @@ process_filenames_from_stdin(Tags) ->
 
 % Traverse the given directory and scan the Erlang files inside for tags.
 process_dir_tree(Top, Tags) ->
-    case file:list_dir(Top) of
-        {ok, FileNames} ->
-            RelFileNames = [filename:join(Top, FileName) ||
-                            FileName <- FileNames],
-            process_filenames(RelFileNames, Tags);
-        eacces ->
-            log_error("Permission denied: ~s~n", [Top]);
-        enoent ->
-            log_error("Directory does not exist: ~s~n", [Top])
+    case get(ignoredir) of
+        undefined -> ok;
+        Top -> ok;
+        _ ->
+            case file:list_dir(Top) of
+                {ok, FileNames} ->
+                    RelFileNames = [filename:join(Top, FileName) ||
+                                    FileName <- FileNames],
+                    process_filenames(RelFileNames, Tags);
+                eacces ->
+                    log_error("Permission denied: ~s~n", [Top]);
+                enoent ->
+                    log_error("Directory does not exist: ~s~n", [Top])
+            end
     end.
 
 % Go through the given files: scan the Erlang files for tags and traverse the
