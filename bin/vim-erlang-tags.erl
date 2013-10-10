@@ -78,15 +78,18 @@
 -define(RE_FUNCTIONS, ?COMPILE("^([a-z][a-zA-Z0-9_@]*)\\s*\\(")).
 -define(RE_DEFINES,   ?COMPILE("^-\\s*(record|define)\\s*\\(\\s*([a-zA-Z0-9_@]*)\\b")).
 
+-define(DEFAULT_PATH, ".").
+
 main(Args) ->
     % Process arguments
     put(files, []),
     put(tagsfilename, "tags"),
+    put(ignored, []),
     parse_args(Args),
     Files =
         case get(files) of
             [] ->
-                ["."];
+                [?DEFAULT_PATH];
             Other ->
                 Other
         end,
@@ -115,9 +118,20 @@ parse_args([Output, TagsFileName|OtherArgs]) when Output == "-o";
     put(tagsfilename, TagsFileName),
     parse_args(OtherArgs);
 parse_args([Output]) when Output == "-o";
-                          Output == "--output" ->
+                          Output == "--output";
+                          Output == "-i";
+                          Output == "--ignore" ->
     log_error("More argument needed after ~s.~n", [Output]),
     halt(1);
+parse_args([Ignored, Name|OtherArgs]) when Ignored == "-i";
+                                           Ignored == "--ignore" ->
+    Files = filelib:wildcard(Name),
+    AllIgnored = case get(ignored) of
+        undefined -> Files;
+        OldFiles -> OldFiles ++ [ filename:absname(N, ?DEFAULT_PATH) || N <- Files ]
+    end,
+    put(ignored, AllIgnored),
+    parse_args(OtherArgs);
 parse_args(["-" ++ Arg|_]) ->
     log_error("Unknown argument: ~s~n", [Arg]),
     halt(1);
@@ -192,15 +206,19 @@ process_filenames_from_stdin(Tags) ->
 
 % Traverse the given directory and scan the Erlang files inside for tags.
 process_dir_tree(Top, Tags) ->
-    case file:list_dir(Top) of
-        {ok, FileNames} ->
-            RelFileNames = [filename:join(Top, FileName) ||
-                            FileName <- FileNames],
-            process_filenames(RelFileNames, Tags);
-        eacces ->
-            log_error("Permission denied: ~s~n", [Top]);
-        enoent ->
-            log_error("Directory does not exist: ~s~n", [Top])
+    IsIgnored = lists:member(Top, get(ignored)),
+    if IsIgnored -> ok;
+       true ->
+            case file:list_dir(Top) of
+                {ok, FileNames} ->
+                    RelFileNames = [filename:join(Top, FileName) ||
+                                    FileName <- FileNames],
+                    process_filenames(RelFileNames, Tags);
+                eacces ->
+                    log_error("Permission denied: ~s~n", [Top]);
+                enoent ->
+                    log_error("Directory does not exist: ~s~n", [Top])
+            end
     end.
 
 % Go through the given files: scan the Erlang files for tags and traverse the
@@ -208,16 +226,20 @@ process_dir_tree(Top, Tags) ->
 process_filenames([], _Tags) ->
     ok;
 process_filenames([File|OtherFiles], Tags) ->
-    case filelib:is_dir(File) of
-        true ->
-            process_dir_tree(File, Tags);
-        false ->
-            case filename:extension(File) of
-                Ext when Ext == ".erl";
-                         Ext == ".hrl" ->
-                    add_tags_from_file(File, Tags);
-                _ ->
-                    ok
+    IsIgnored = lists:member(File, get(ignored)),
+    if IsIgnored -> ok;
+       true ->
+            case filelib:is_dir(File) of
+                true ->
+                    process_dir_tree(File, Tags);
+                false ->
+                    case filename:extension(File) of
+                        Ext when Ext == ".erl";
+                                 Ext == ".hrl" ->
+                            add_tags_from_file(File, Tags);
+                        _ ->
+                            ok
+                    end
             end
     end,
     process_filenames(OtherFiles, Tags).
