@@ -25,12 +25,12 @@ let s:exec_script = expand('<sfile>:p:h') . "/../bin/vim-erlang-tags.erl"
 
 function! VimErlangTags()
     if exists("g:erlang_tags_ignore") && g:erlang_tags_ignore != ""
-        let s:script_opts = " --ignore " . g:erlang_tags_ignore
+        let script_opts = " --ignore " . g:erlang_tags_ignore
     else
-        let s:script_opts = ""
+        let script_opts = ""
     endif
 
-    let script_output = system(s:exec_script . s:script_opts)
+    let script_output = system(s:exec_script . script_opts)
     if !v:shell_error
         return 0
     else
