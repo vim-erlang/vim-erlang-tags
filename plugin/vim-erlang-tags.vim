@@ -43,7 +43,10 @@ command! ErlangTags call VimErlangTags()
 function! VimErlangTagsSelect()
     let orig_isk = &isk
     set isk+=:
-    normal "_vaw
+    normal "_vawo
+    if getline('.')[col('.') - 2] =~# '[#?]'
+        normal h
+    endif
     let &isk = orig_isk
 endfunction
 
