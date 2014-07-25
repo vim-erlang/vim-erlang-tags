@@ -317,14 +317,14 @@ add_func_tags(Tags, File, ModName, FuncName) ->
 % File contains a macro or record called Name; add this information to Tags.
 add_record_or_macro_tag(Tags, File, Attribute, Name) ->
 
-    Kind =
+    {Kind, Prefix} =
         case Attribute of
             <<"record">> ->
                 log("Record found: ~s~n", [Name]),
-                $r;
+                {$r, $#};
             <<"define">> ->
                 log("Macro found: ~s~n", [Name]),
-                $d
+                {$d, $?}
         end,
 
     Scope =
@@ -337,9 +337,17 @@ add_record_or_macro_tag(Tags, File, Attribute, Name) ->
 
     % myrec  ./mymod.erl  /^-record\.\*\<myrec\>/;"  r  file:
     % myrec  ./myhrl.hrl  /^-record\.\*\<myrec\>/;"  r
-    % myrec  ./mymod.erl  /^-define\.\*\<mymac\>/;"  m  file:
-    % myrec  ./myhrl.hrl  /^-define\.\*\<mymac\>/;"  m
+    % mymac  ./mymod.erl  /^-define\.\*\<mymac\>/;"  m  file:
+    % mymac  ./myhrl.hrl  /^-define\.\*\<mymac\>/;"  m
     add_tag(Tags, Name, File,
+            ["/^-\\s\\*", Attribute, "\\s\\*(\\s\\*", Name, "\\>/"],
+            Scope, Kind),
+
+    % #myrec  ./mymod.erl  /^-record\.\*\<myrec\>/;"  r  file:
+    % #myrec  ./myhrl.hrl  /^-record\.\*\<myrec\>/;"  r
+    % ?mymac  ./mymod.erl  /^-define\.\*\<mymac\>/;"  m  file:
+    % ?mymac  ./myhrl.hrl  /^-define\.\*\<mymac\>/;"  m
+    add_tag(Tags, [Prefix|Name], File,
             ["/^-\\s\\*", Attribute, "\\s\\*(\\s\\*", Name, "\\>/"],
             Scope, Kind).
 
