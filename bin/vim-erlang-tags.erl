@@ -52,6 +52,14 @@
 %%%
 %%%         mymod:f  ./mymod.erl  /^f\>/;"  f
 %%%
+%%%     {Type, FilePath, local, $t} -> TagAddress
+%%%
+%%%         mytype  ./mymod.erl  /^-type\s\*\<mytype\>/;"  t  file:
+%%%
+%%%     {Type, FilePath, global, $t} -> TagAddress
+%%%
+%%%         mymod:mytype  ./mymod.erl  /^-type\s\*\<mytype\>/;"  t
+%%%
 %%%     {Record, FilePath, local, $r} -> TagAddress
 %%%
 %%%         myrec  ./mymod.erl  /^-record\s\*\<myrec\>/;"  r  file:
@@ -76,6 +84,7 @@
                  end).
 
 -define(RE_FUNCTIONS, ?COMPILE("^([a-z][a-zA-Z0-9_@]*)\\s*\\(")).
+-define(RE_TYPESPECS, ?COMPILE("^-\\s*(type|opaque)\\s*([a-zA-Z0-9_@]*)\\b")).
 -define(RE_DEFINES,   ?COMPILE("^-\\s*(record|define)\\s*\\(\\s*([a-zA-Z0-9_@]*)\\b")).
 
 -define(DEFAULT_PATH, ".").
@@ -285,12 +294,19 @@ scan_tags(Contents, {Tags, File, ModName}) ->
             [ add_func_tags(Tags, File, ModName, FuncName )
               || [_, FuncName] <- Matches1 ]
     end,
-    case re:run(Contents, ?RE_DEFINES, [{capture, all, binary}, global]) of
+    case re:run(Contents, ?RE_TYPESPECS, [{capture, all, binary}, global]) of
         nomatch ->
             ok;
         {match, Matches2} ->
+            [ add_type_tags(Tags, File, ModName, Attr, TypeName)
+              || [_, Attr, TypeName] <- Matches2 ]
+    end,
+    case re:run(Contents, ?RE_DEFINES, [{capture, all, binary}, global]) of
+        nomatch ->
+            ok;
+        {match, Matches3} ->
             [ add_record_or_macro_tag(Tags, File, Attr, Name )
-              || [_, Attr, Name] <- Matches2 ]
+              || [_, Attr, Name] <- Matches3 ]
     end,
     ok.
 
@@ -326,6 +342,25 @@ add_func_tags(Tags, File, ModName, FuncName) ->
     % Static (or local) entry:
     % f <tab> ./mymod.erl <tab> /^f\>/ <space><space> ;" <tab> file:
     add_tag(Tags, FuncName, File, ["/^", FuncName, "\\>/"], local, $f).
+
+% File contains the type ModName:Type; add this information to Tags.
+add_type_tags(Tags, File, ModName, Attribute, TypeName) ->
+
+    log("Type definition found: ~s~n", [TypeName]),
+
+    Pattern = ["/^-\\s\\*", Attribute, "\\s\\*", TypeName, "\\>/"],
+
+    % Global entry:
+    % mymod:mytype <tab> ./mymod.erl <tab> /^-type\s\*mytype\>/
+    % mymod:mytype <tab> ./mymod.erl <tab> /^-opaque\s\*mytype\>/
+    add_tag(Tags, [ModName, ":", TypeName], File, Pattern, global, $t),
+
+    % Static (or local) entry:
+    % mytype <tab> ./mymod.erl <tab> /^-type\s\*mytype\>/
+    %     <space><space> ;" <tab> file:
+    % mytype <tab> ./mymod.erl <tab> /^-opaque\s\*mytype\>/
+    %     <space><space> ;" <tab> file:
+    add_tag(Tags, TypeName, File, Pattern, local, $t).
 
 % File contains a macro or record called Name; add this information to Tags.
 add_record_or_macro_tag(Tags, File, Attribute, Name) ->
