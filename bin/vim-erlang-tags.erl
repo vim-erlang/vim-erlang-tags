@@ -54,19 +54,19 @@
 %%%
 %%%     {Record, FilePath, local, $r} -> TagAddress
 %%%
-%%%         myrec  ./mymod.erl  /^-record\.\*\<myrec\>/;"  r  file:
+%%%         myrec  ./mymod.erl  /^-record\s\*\<myrec\>/;"  r  file:
 %%%
 %%%     {Record, FilePath, global, $r} -> TagAddress
 %%%
-%%%         myrec  ./myhrl.hrl  /^-record\.\*\<myrec\>/;"  r
+%%%         myrec  ./myhrl.hrl  /^-record\s\*\<myrec\>/;"  r
 %%%
 %%%     {Macro, FilePath, local, $d} -> TagAddress
 %%%
-%%%         mymac  ./mymod.erl  /^-record\.\*\<myrec\>/;"  d  file:
+%%%         mymac  ./mymod.erl  /^-define\s\*\<mymac\>/;"  d  file:
 %%%
 %%%     {Macro, FilePath, global, $d} -> TagAddress
 %%%
-%%%         mymac  ./myhrl.hrl  /^-record\.\*\<myrec\>/;"  d
+%%%         mymac  ./myhrl.hrl  /^-define\s\*\<mymac\>/;"  d
 
 -mode(compile).
 
@@ -348,18 +348,18 @@ add_record_or_macro_tag(Tags, File, Attribute, Name) ->
                 local
         end,
 
-    % myrec  ./mymod.erl  /^-record\.\*\<myrec\>/;"  r  file:
-    % myrec  ./myhrl.hrl  /^-record\.\*\<myrec\>/;"  r
-    % mymac  ./mymod.erl  /^-define\.\*\<mymac\>/;"  m  file:
-    % mymac  ./myhrl.hrl  /^-define\.\*\<mymac\>/;"  m
+    % myrec  ./mymod.erl  /^-record\s\*\<myrec\>/;"  r  file:
+    % myrec  ./myhrl.hrl  /^-record\s\*\<myrec\>/;"  r
+    % mymac  ./mymod.erl  /^-define\s\*\<mymac\>/;"  m  file:
+    % mymac  ./myhrl.hrl  /^-define\s\*\<mymac\>/;"  m
     add_tag(Tags, Name, File,
             ["/^-\\s\\*", Attribute, "\\s\\*(\\s\\*", Name, "\\>/"],
             Scope, Kind),
 
-    % #myrec  ./mymod.erl  /^-record\.\*\<myrec\>/;"  r  file:
-    % #myrec  ./myhrl.hrl  /^-record\.\*\<myrec\>/;"  r
-    % ?mymac  ./mymod.erl  /^-define\.\*\<mymac\>/;"  m  file:
-    % ?mymac  ./myhrl.hrl  /^-define\.\*\<mymac\>/;"  m
+    % #myrec  ./mymod.erl  /^-record\s\*\<myrec\>/;"  r  file:
+    % #myrec  ./myhrl.hrl  /^-record\s\*\<myrec\>/;"  r
+    % ?mymac  ./mymod.erl  /^-define\s\*\<mymac\>/;"  m  file:
+    % ?mymac  ./myhrl.hrl  /^-define\s\*\<mymac\>/;"  m
     add_tag(Tags, [Prefix|Name], File,
             ["/^-\\s\\*", Attribute, "\\s\\*(\\s\\*", Name, "\\>/"],
             Scope, Kind).
