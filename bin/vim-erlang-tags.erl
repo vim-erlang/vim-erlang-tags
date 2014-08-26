@@ -24,11 +24,11 @@
 
 %%% The Tags ets table has the following scheme:
 %%%
-%%%     {{TagName, FilePath, Kind, Scope}, TagAddress}
+%%%     {{TagName, FilePath, Scope, Kind}, TagAddress}
 %%%
 %%% Or in more readable notation:
 %%%
-%%%     {TagName, FilePath, Kind, Scope} -> TagAddress
+%%%     {TagName, FilePath, Scope, Kind} -> TagAddress
 %%%
 %%% Examples of entries (and the tags output generated from them):
 %%%
@@ -365,7 +365,7 @@ add_record_or_macro_tag(Tags, File, Attribute, Name) ->
             Scope, Kind).
 
 add_tag(Tags, Tag, File, TagAddress, Scope, Kind) ->
-    ets:insert_new(Tags, {{Tag, File, Kind, Scope}, TagAddress}).
+    ets:insert_new(Tags, {{Tag, File, Scope, Kind}, TagAddress}).
 
 %%%=============================================================================
 %%% Writing tags into a file
@@ -377,7 +377,7 @@ tags_to_file(Tags, TagsFile) ->
     file:write_file(TagsFile, [Header, Entries]),
     ok.
 
-tag_to_binary({{Tag, File, Kind, Scope}, TagAddress}) ->
+tag_to_binary({{Tag, File, Scope, Kind}, TagAddress}) ->
     ScopeStr =
     case Scope of
         global ->
