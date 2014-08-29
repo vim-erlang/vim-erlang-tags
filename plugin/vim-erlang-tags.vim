@@ -24,17 +24,20 @@ autocmd FileType erlang call VimErlangTagsDefineMappings()
 let s:exec_script = expand('<sfile>:p:h') . "/../bin/vim-erlang-tags.erl"
 
 function! VimErlangTags()
+    let script_opts = ""
     if exists("g:erlang_tags_ignore") && g:erlang_tags_ignore != ""
-        let script_opts = " --ignore " . g:erlang_tags_ignore
-    else
-        let script_opts = ""
+        let script_opts = script_opts . " --ignore " . g:erlang_tags_ignore
+    endif
+
+    if exists("g:erlang_tags_outfile") && g:erlang_tags_outfile != ""
+        let script_opts = script_opts . " --output " . g:erlang_tags_outfile
     endif
 
     let script_output = system(s:exec_script . script_opts)
     if !v:shell_error
         return 0
     else
-        echoerr "vim-erlang-tags: " . script_output
+        echoerr "vim-erlang-tag " . script_output
     endif
 endfunction
 
