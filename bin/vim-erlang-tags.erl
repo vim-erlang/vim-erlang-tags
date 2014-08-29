@@ -85,13 +85,20 @@ main(Args) ->
     put(files, []),
     put(tagsfilename, "tags"),
     put(ignored, []),
+    put(incl_otp, false),
     parse_args(Args),
-    Files =
+    ArgFiles =
         case get(files) of
             [] ->
                 [?DEFAULT_PATH];
             Other ->
                 Other
+        end,
+
+    Files =
+        case get(incl_otp) of
+            true -> [code:lib_dir()|ArgFiles];
+            false -> ArgFiles
         end,
 
     Tags = create_tags(Files),
@@ -112,6 +119,11 @@ parse_args([Verbose|OtherArgs]) when Verbose == "-v";
                                      Verbose == "--verbose" ->
     put(verbose, true),
     log("Verbose mode on.~n"),
+    parse_args(OtherArgs);
+parse_args([InclOTP|OtherArgs]) when InclOTP == "-p";
+                                     InclOTP == "--otp" ->
+    put(incl_otp, true),
+    log("Including OTP in.~n"),
     parse_args(OtherArgs);
 parse_args([Output, TagsFileName|OtherArgs]) when Output == "-o";
                                                   Output == "--output" ->
@@ -160,6 +172,7 @@ Options:
                 Ignore the files/directories that match the given wildcard.
                 Read http://www.erlang.org/doc/man/filelib.html#wildcard-1 for
                 the wildcard patterns.
+  -p, --otp     Include the currently used OTP lib_dir
 
 Example:
   $ vim-erlang-tags.erl
