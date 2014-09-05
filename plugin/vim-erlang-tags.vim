@@ -25,8 +25,15 @@ let s:exec_script = expand('<sfile>:p:h') . "/../bin/vim-erlang-tags.erl"
 
 function! VimErlangTags()
     let script_opts = ""
-    if exists("g:erlang_tags_ignore") && g:erlang_tags_ignore != ""
-        let script_opts = script_opts . " --ignore " . g:erlang_tags_ignore
+
+    if exists("g:erlang_tags_ignore")
+        let ignored_paths = (type(g:erlang_tags_ignore) == type("string") ?
+                          \  [ g:erlang_tags_ignore ] :
+                          \  g:erlang_tags_ignore)
+
+        for path in ignored_paths
+            let script_opts = script_opts . " --ignore " . path
+        endfor
     endif
 
     if exists("g:erlang_tags_outfile") && g:erlang_tags_outfile != ""
