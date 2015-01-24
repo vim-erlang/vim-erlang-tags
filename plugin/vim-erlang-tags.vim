@@ -65,8 +65,8 @@ endfunction
 
 function! VimErlangTagsDefineMappings()
     nnoremap <buffer> <c-]>         :call VimErlangTagsSelect(0)<cr><c-]>
-    nnoremap <buffer> g<LeftMouse>  :call VimErlangTagsSelect(0)<cr>g<LeftMouse>
-    nnoremap <buffer> <c-LeftMouse> :call VimErlangTagsSelect(0)<cr><c-LeftMouse>
+    nnoremap <buffer> g<LeftMouse>  :call VimErlangTagsSelect(0)<cr><c-]>
+    nnoremap <buffer> <c-LeftMouse> :call VimErlangTagsSelect(0)<cr><c-]>
     nnoremap <buffer> g]            :call VimErlangTagsSelect(0)<cr>g]
     nnoremap <buffer> g<c-]>        :call VimErlangTagsSelect(0)<cr>g<c-]>
     nnoremap <buffer> <c-w><c-]>    :call VimErlangTagsSelect(1)<cr><c-]>
