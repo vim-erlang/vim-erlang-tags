@@ -83,9 +83,11 @@
                          CRE
                  end).
 
--define(RE_FUNCTIONS, ?COMPILE("^([a-z][a-zA-Z0-9_@]*)\\s*\\(")).
--define(RE_TYPESPECS, ?COMPILE("^-\\s*(type|opaque)\\s*([a-zA-Z0-9_@]*)\\b")).
--define(RE_DEFINES,   ?COMPILE("^-\\s*(record|define)\\s*\\(\\s*([a-zA-Z0-9_@]*)\\b")).
+-define(RE_FUNCTIONS,  ?COMPILE("^([a-z][a-zA-Z0-9_@]*)\\s*\\(")).
+-define(RE_TYPESPECS1, ?COMPILE("^-\\s*(type|opaque)\\s*([a-zA-Z0-9_@]+)\\b")).
+-define(RE_TYPESPECS2, ?COMPILE("^-\\s*(type|opaque)\\s*'([^ \\t']+)'")).
+-define(RE_DEFINES1,   ?COMPILE("^-\\s*(record|define)\\s*\\(\\s*([a-zA-Z0-9_@]+)\\b")).
+-define(RE_DEFINES2,   ?COMPILE("^-\\s*(record|define)\\s*\\(\\s*'([^ \\t']+)'")).
 
 -define(DEFAULT_PATH, ".").
 
@@ -287,28 +289,44 @@ add_tags_from_file(File, Tags) ->
     ok = scan_tags(Contents, {Tags, File, ModName}).
 
 scan_tags(Contents, {Tags, File, ModName}) ->
-    case re:run(Contents, ?RE_FUNCTIONS, [{capture, all, binary}, global]) of
-        nomatch ->
-            ok;
-        {match, Matches1} ->
-            [ add_func_tags(Tags, File, ModName, FuncName )
-              || [_, FuncName] <- Matches1 ]
-    end,
-    case re:run(Contents, ?RE_TYPESPECS, [{capture, all, binary}, global]) of
-        nomatch ->
-            ok;
-        {match, Matches2} ->
-            [ add_type_tags(Tags, File, ModName, Attr, TypeName)
-              || [_, Attr, TypeName] <- Matches2 ]
-    end,
-    case re:run(Contents, ?RE_DEFINES, [{capture, all, binary}, global]) of
-        nomatch ->
-            ok;
-        {match, Matches3} ->
-            [ add_record_or_macro_tag(Tags, File, Attr, Name )
-              || [_, Attr, Name] <- Matches3 ]
-    end,
+    scan_tags_core(
+      Contents, ?RE_FUNCTIONS,
+      fun([_, FuncName]) ->
+              add_func_tags(Tags, File, ModName, FuncName)
+      end),
+    scan_tags_core(
+      Contents, ?RE_TYPESPECS1,
+      fun([_, Attr, TypeName]) ->
+              InnerPattern = [TypeName, "\\>"],
+              add_type_tags(Tags, File, ModName, Attr, TypeName, InnerPattern)
+      end),
+    scan_tags_core(
+      Contents, ?RE_TYPESPECS2,
+      fun([_, Attr, TypeName]) ->
+              InnerPattern = [$', TypeName, $'],
+              add_type_tags(Tags, File, ModName, Attr, TypeName, InnerPattern)
+      end),
+    scan_tags_core(
+      Contents, ?RE_DEFINES1,
+      fun([_, Attr, Name]) ->
+              InnerPattern = [Name, "\\>"],
+              add_record_or_macro_tag(Tags, File, Attr, Name, InnerPattern)
+      end),
+    scan_tags_core(
+      Contents, ?RE_DEFINES2,
+      fun([_, Attr, Name]) ->
+              InnerPattern = [$', Name, $'],
+              add_record_or_macro_tag(Tags, File, Attr, Name, InnerPattern)
+      end),
     ok.
+
+scan_tags_core(Contents, Pattern, Fun) ->
+    case re:run(Contents, Pattern, [{capture, all, binary}, global]) of
+        nomatch ->
+            ok;
+        {match, Matches} ->
+            lists:foreach(Fun, Matches)
+    end.
 
 %%%=============================================================================
 %%% Add specific tags
@@ -344,11 +362,11 @@ add_func_tags(Tags, File, ModName, FuncName) ->
     add_tag(Tags, FuncName, File, ["/^", FuncName, "\\>/"], local, $f).
 
 % File contains the type ModName:Type; add this information to Tags.
-add_type_tags(Tags, File, ModName, Attribute, TypeName) ->
+add_type_tags(Tags, File, ModName, Attribute, TypeName, InnerPattern) ->
 
     log("Type definition found: ~s~n", [TypeName]),
 
-    Pattern = ["/^-\\s\\*", Attribute, "\\s\\*", TypeName, "\\>/"],
+    Pattern = ["/^-\\s\\*", Attribute, "\\s\\*", InnerPattern, $/],
 
     % Global entry:
     % mymod:mytype <tab> ./mymod.erl <tab> /^-type\s\*mytype\>/
@@ -363,7 +381,7 @@ add_type_tags(Tags, File, ModName, Attribute, TypeName) ->
     add_tag(Tags, TypeName, File, Pattern, local, $t).
 
 % File contains a macro or record called Name; add this information to Tags.
-add_record_or_macro_tag(Tags, File, Attribute, Name) ->
+add_record_or_macro_tag(Tags, File, Attribute, Name, InnerPattern) ->
 
     {Kind, Prefix} =
         case Attribute of
@@ -388,7 +406,7 @@ add_record_or_macro_tag(Tags, File, Attribute, Name) ->
     % mymac  ./mymod.erl  /^-define\s\*\<mymac\>/;"  m  file:
     % mymac  ./myhrl.hrl  /^-define\s\*\<mymac\>/;"  m
     add_tag(Tags, Name, File,
-            ["/^-\\s\\*", Attribute, "\\s\\*(\\s\\*", Name, "\\>/"],
+            ["/^-\\s\\*", Attribute, "\\s\\*(\\s\\*", InnerPattern, "/"],
             Scope, Kind),
 
     % #myrec  ./mymod.erl  /^-record\s\*\<myrec\>/;"  r  file:
@@ -396,7 +414,7 @@ add_record_or_macro_tag(Tags, File, Attribute, Name) ->
     % ?mymac  ./mymod.erl  /^-define\s\*\<mymac\>/;"  m  file:
     % ?mymac  ./myhrl.hrl  /^-define\s\*\<mymac\>/;"  m
     add_tag(Tags, [Prefix|Name], File,
-            ["/^-\\s\\*", Attribute, "\\s\\*(\\s\\*", Name, "\\>/"],
+            ["/^-\\s\\*", Attribute, "\\s\\*(\\s\\*", InnerPattern, "/"],
             Scope, Kind).
 
 add_tag(Tags, Tag, File, TagAddress, Scope, Kind) ->
