@@ -50,7 +50,10 @@ endfunction
 
 command! ErlangTags call VimErlangTags()
 
-function! VimErlangTagsSelect()
+function! VimErlangTagsSelect(split)
+    if a:split
+        split
+    endif
     let orig_isk = &isk
     set isk+=:
     normal "_vawo
@@ -61,9 +64,11 @@ function! VimErlangTagsSelect()
 endfunction
 
 function! VimErlangTagsDefineMappings()
-    nnoremap <buffer> <c-]>         :call VimErlangTagsSelect()<cr><c-]>
-    nnoremap <buffer> g<LeftMouse>  :call VimErlangTagsSelect()<cr>g<LeftMouse>
-    nnoremap <buffer> <c-LeftMouse> :call VimErlangTagsSelect()<cr><c-LeftMouse>
-    nnoremap <buffer> g]            :call VimErlangTagsSelect()<cr>g]
-    nnoremap <buffer> g<c-]>        :call VimErlangTagsSelect()<cr>g<c-]>
+    nnoremap <buffer> <c-]>         :call VimErlangTagsSelect(0)<cr><c-]>
+    nnoremap <buffer> g<LeftMouse>  :call VimErlangTagsSelect(0)<cr>g<LeftMouse>
+    nnoremap <buffer> <c-LeftMouse> :call VimErlangTagsSelect(0)<cr><c-LeftMouse>
+    nnoremap <buffer> g]            :call VimErlangTagsSelect(0)<cr>g]
+    nnoremap <buffer> g<c-]>        :call VimErlangTagsSelect(0)<cr>g<c-]>
+    nnoremap <buffer> <c-w><c-]>    :call VimErlangTagsSelect(1)<cr><c-]>
+    nnoremap <buffer> <c-w>]        :call VimErlangTagsSelect(1)<cr><c-]>
 endfunction
