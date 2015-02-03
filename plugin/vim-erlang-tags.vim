@@ -50,25 +50,29 @@ endfunction
 
 command! ErlangTags call VimErlangTags()
 
-function! VimErlangTagsSelect(split)
-    if a:split
-        split
-    endif
+" Execute the given tag lookup for current word, where 'iskeyword' is
+" temporarily set such that modules, records, and macros are included.
+function! s:GoToErlangTag(cmd)
     let orig_isk = &isk
-    set isk+=:
-    normal "_vawo
-    if getline('.')[col('.') - 2] =~# '[#?]'
-        normal h
-    endif
+    set isk+=:,#,?
+    let ident = expand('<cword>')
     let &isk = orig_isk
+
+    execute a:cmd ident
 endfunction
 
 function! VimErlangTagsDefineMappings()
-    nnoremap <buffer> <c-]>         :call VimErlangTagsSelect(0)<cr><c-]>
-    nnoremap <buffer> g<LeftMouse>  :call VimErlangTagsSelect(0)<cr><c-]>
-    nnoremap <buffer> <c-LeftMouse> :call VimErlangTagsSelect(0)<cr><c-]>
-    nnoremap <buffer> g]            :call VimErlangTagsSelect(0)<cr>g]
-    nnoremap <buffer> g<c-]>        :call VimErlangTagsSelect(0)<cr>g<c-]>
-    nnoremap <buffer> <c-w><c-]>    :call VimErlangTagsSelect(1)<cr><c-]>
-    nnoremap <buffer> <c-w>]        :call VimErlangTagsSelect(1)<cr><c-]>
+    nnoremap <buffer> <c-]>         :<C-U>call <SID>GoToErlangTag('tag')<cr>
+    nnoremap <buffer> g<LeftMouse>  :<C-U>call <SID>GoToErlangTag('tag')<cr>
+    nnoremap <buffer> <c-LeftMouse> :<C-U>call <SID>GoToErlangTag('tag')<cr>
+    nnoremap <buffer> g]            :<C-U>call <SID>GoToErlangTag('tselect')<cr>
+    nnoremap <buffer> g<c-]>        :<C-U>call <SID>GoToErlangTag('tjump')<cr>
+    nnoremap <buffer> <c-w><c-]>    :<C-U>call <SID>GoToErlangTag('stag')<cr>
+    nnoremap <buffer> <c-w>]        :<C-U>call <SID>GoToErlangTag('stag')<cr>
+    nnoremap <buffer> <c-w>g]       :<C-U>call <SID>GoToErlangTag('stselect')<cr>
+    nnoremap <buffer> <c-w>g<c-]>   :<C-U>call <SID>GoToErlangTag('stjump')<cr>
+    nnoremap <buffer> <c-w>}        :<C-U>call <SID>GoToErlangTag('ptag')<cr>
+    nnoremap <buffer> <c-w>g}       :<C-U>call <SID>GoToErlangTag('ptjump')<cr>
 endfunction
+
+" vim:set expandtab sw=4 ts=4:
