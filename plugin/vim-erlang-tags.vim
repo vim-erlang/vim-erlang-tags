@@ -90,8 +90,15 @@ endfunction
 function! s:ExecWithPreviewHeight(cmd, height)
     let orig_height = &previewheight
     let &previewheight = a:height
-    execute a:cmd
-    let &previewheight = orig_height
+
+    try
+        execute a:cmd
+    catch /E426/  " tag not found
+        pclose    " Spurious preview window is left open, close it.
+        echohl WarningMsg | echom v:exception | echohl None
+    finally
+        let &previewheight = orig_height
+    endtry
 endfunction
 
 function! VimErlangTagsDefineMappings()
