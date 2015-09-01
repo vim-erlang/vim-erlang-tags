@@ -179,7 +179,7 @@ Options:
   -             Read the list of files from the standard input.
   -o, --output FILE
                 Write the output into the given file instead of ./tags.
-  --i, --ignore FILE_WILDCARD
+  -i, --ignore FILE_WILDCARD
                 Ignore the files/directories that match the given wildcard.
                 Read http://www.erlang.org/doc/man/filelib.html#wildcard-1 for
                 the wildcard patterns.
