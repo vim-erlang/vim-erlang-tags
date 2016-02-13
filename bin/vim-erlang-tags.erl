@@ -285,8 +285,10 @@ add_tags_from_file(File, Tags) ->
     ModName = filename:rootname(BaseName), % e.g. "mymod"
     add_file_tag(Tags, File, BaseName, ModName),
 
-    {ok, Contents} = file:read_file(File),
-    ok = scan_tags(Contents, {Tags, File, ModName}).
+    case file:read_file(File) of
+        {ok, Contents} -> ok = scan_tags(Contents, {Tags, File, ModName});
+        Err -> log_error("File ~s not readable: ~p~n", [File, Err])
+    end.
 
 scan_tags(Contents, {Tags, File, ModName}) ->
     scan_tags_core(
