@@ -86,8 +86,8 @@
 -define(RE_FUNCTIONS,  ?COMPILE("^([a-z][a-zA-Z0-9_@]*)\\s*\\(")).
 -define(RE_TYPESPECS1, ?COMPILE("^-\\s*(type|opaque)\\s*([a-zA-Z0-9_@]+)\\b")).
 -define(RE_TYPESPECS2, ?COMPILE("^-\\s*(type|opaque)\\s*'([^ \\t']+)'")).
--define(RE_DEFINES1,   ?COMPILE("^-\\s*(record|define)\\s*\\(\\s*([a-zA-Z0-9_@]+)\\b")).
--define(RE_DEFINES2,   ?COMPILE("^-\\s*(record|define)\\s*\\(\\s*'([^ \\t']+)'")).
+-define(RE_DEFINES1,   ?COMPILE("^-\\s*(record|define)\\s*\\(?\\s*([a-zA-Z0-9_@]+)\\b")).
+-define(RE_DEFINES2,   ?COMPILE("^-\\s*(record|define)\\s*\\(?\\s*'([^ \\t']+)'")).
 
 -define(DEFAULT_PATH, ".").
 
@@ -408,7 +408,7 @@ add_record_or_macro_tag(Tags, File, Attribute, Name, InnerPattern) ->
     % mymac  ./mymod.erl  /^-define\s\*\<mymac\>/;"  m  file:
     % mymac  ./myhrl.hrl  /^-define\s\*\<mymac\>/;"  m
     add_tag(Tags, Name, File,
-            ["/^-\\s\\*", Attribute, "\\s\\*(\\s\\*", InnerPattern, "/"],
+            ["/^-\\s\\*", Attribute, "\\s\\*(\\?\\s\\*", InnerPattern, "/"],
             Scope, Kind),
 
     % #myrec  ./mymod.erl  /^-record\s\*\<myrec\>/;"  r  file:
@@ -416,7 +416,7 @@ add_record_or_macro_tag(Tags, File, Attribute, Name, InnerPattern) ->
     % ?mymac  ./mymod.erl  /^-define\s\*\<mymac\>/;"  m  file:
     % ?mymac  ./myhrl.hrl  /^-define\s\*\<mymac\>/;"  m
     add_tag(Tags, [Prefix|Name], File,
-            ["/^-\\s\\*", Attribute, "\\s\\*(\\s\\*", InnerPattern, "/"],
+            ["/^-\\s\\*", Attribute, "\\s\\*(\\?\\s\\*", InnerPattern, "/"],
             Scope, Kind).
 
 add_tag(Tags, Tag, File, TagAddress, Scope, Kind) ->
