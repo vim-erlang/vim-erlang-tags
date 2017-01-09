@@ -65,7 +65,7 @@ function! VimErlangTagsSelect(split)
     let a:module_marco_start = stridx(a:line, "?MODULE", col('.') - 1)
     if a:module_marco_start == col('.') - 1
         " this is started with ?MODULE, so re-selecte it
-        normal ovh"_vawo
+        normal ov"_vawo
     endif
 endfunction
 
