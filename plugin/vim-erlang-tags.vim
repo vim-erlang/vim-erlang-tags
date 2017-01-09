@@ -54,13 +54,19 @@ function! VimErlangTagsSelect(split)
     if a:split
         split
     endif
-    let orig_isk = &isk
+    let a:orig_isk = &isk
     set isk+=:
     normal "_vawo
-    if getline('.')[col('.') - 2] =~# '[#?]'
+    let a:line = getline('.')
+    if a:line[col('.') - 2] =~# '[#?]'
         normal h
     endif
-    let &isk = orig_isk
+    let &isk = a:orig_isk
+    let a:module_marco_start = stridx(a:line, "?MODULE", col('.') - 1)
+    if a:module_marco_start == col('.') - 1
+        " this is started with ?MODULE, so re-selecte it
+        normal ov"_vawo
+    endif
 endfunction
 
 function! VimErlangTagsDefineMappings()
