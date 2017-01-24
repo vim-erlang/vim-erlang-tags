@@ -56,7 +56,7 @@ function! VimErlangTagsSelect(split)
     endif
     let orig_isk = &isk
     set isk+=:
-    normal "_vawo
+    normal "_viwo
     let curr_line = getline('.')
     if curr_line[col('.') - 2] =~# '[#?]'
         normal h
@@ -66,7 +66,7 @@ function! VimErlangTagsSelect(split)
     if module_marco_start == col('.') - 1
         " The selected text starts with ?MODULE, so re-select only the
         " function name.
-        normal ov"_vawo
+        normal ov"_viwo
     endif
 endfunction
 
