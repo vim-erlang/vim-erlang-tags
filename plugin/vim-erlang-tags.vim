@@ -54,10 +54,13 @@ function! VimErlangTagsSelect(split)
     if a:split
         split
     endif
+    let curr_line = getline('.')
+    if curr_line[col('.') - 1] =~# '[#?]'
+        normal w
+    endif
     let orig_isk = &isk
     set isk+=:
     normal "_viwo
-    let curr_line = getline('.')
     if curr_line[col('.') - 2] =~# '[#?]'
         normal h
     endif
