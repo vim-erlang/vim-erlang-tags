@@ -21,7 +21,17 @@ endif
 
 autocmd FileType erlang call VimErlangTagsDefineMappings()
 
-let s:exec_script = expand('<sfile>:p:h') . "/../bin/vim-erlang-tags.erl"
+let s:script_opts = ""
+
+if exists("g:erlang_tags_ignore") && g:erlang_tags_ignore != ""
+    let s:script_opts = " --ignore " . g:erlang_tags_ignore
+endif
+
+if exists("g:erlang_tags_outfile") && g:erlang_tags_outfile != ""
+    let s:script_opts = s:script_opts . " --output " . g:erlang_tags_outfile
+endif
+
+let s:exec_script = expand('<sfile>:p:h') . "/../bin/vim-erlang-tags.erl" . s:script_opts
 
 function! VimErlangTags()
     let script_opts = ""
