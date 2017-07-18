@@ -23,7 +23,7 @@ autocmd FileType erlang call VimErlangTagsDefineMappings()
 
 let s:exec_script = expand('<sfile>:p:h') . "/../bin/vim-erlang-tags.erl"
 
-function! VimErlangTags()
+function! s:GetExecuteCmd()
     let script_opts = ""
 
     if exists("g:erlang_tags_ignore")
@@ -39,8 +39,13 @@ function! VimErlangTags()
     if exists("g:erlang_tags_outfile") && g:erlang_tags_outfile != ""
         let script_opts = script_opts . " --output " . g:erlang_tags_outfile
     endif
+    return s:exec_script . script_opts
+endfunction
 
-    let script_output = system(s:exec_script . script_opts)
+function! VimErlangTags()
+    let exec_cmd = s:GetExecuteCmd()
+
+    let script_output = system(exec_cmd)
     if !v:shell_error
         return 0
     else
@@ -48,7 +53,16 @@ function! VimErlangTags()
     endif
 endfunction
 
+function! AsyncVimErlangTags()
+    let exec_cmd = s:GetExecuteCmd()
+    call system(exec_cmd . '&')
+endfunction
+
 command! ErlangTags call VimErlangTags()
+
+if exists("g:erlang_tags_auto_update") && g:erlang_tags_auto_update == 1
+    au BufWritePost *.erl,*.hrl call AsyncVimErlangTags()
+endif
 
 function! VimErlangTagsSelect(split)
     if a:split
