@@ -71,14 +71,15 @@ function! VimErlangTagsSelect(split)
     let a:orig_isk = &isk
     set isk+=:
     normal "_vawo
-    let a:line = getline('.')
-    if a:line[col('.') - 2] =~# '[#?]'
+    let curr_line = getline('.')
+    if curr_line[col('.') - 2] =~# '[#?]'
         normal h
     endif
-    let &isk = a:orig_isk
-    let a:module_marco_start = stridx(a:line, "?MODULE", col('.') - 1)
-    if a:module_marco_start == col('.') - 1
-        " this is started with ?MODULE, so re-selecte it
+    let &isk = orig_isk
+    let module_marco_start = stridx(curr_line, "?MODULE", col('.') - 1)
+    if module_marco_start == col('.') - 1
+        " The selected text starts with ?MODULE, so re-select only the
+        " function name.
         normal ov"_vawo
     endif
 endfunction
