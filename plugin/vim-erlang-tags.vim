@@ -68,7 +68,7 @@ function! VimErlangTagsSelect(split)
     if a:split
         split
     endif
-    let a:orig_isk = &isk
+    let orig_isk = &isk
     set isk+=:
     normal "_vawo
     let curr_line = getline('.')
