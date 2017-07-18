@@ -62,6 +62,30 @@ Or within Vim by executing the following command:
 Note that for the latter command, the current working directory will be used
 (`:help pwd` to find out more).
 
+### Options
+
+#### `g:erlang_tags_ignore`
+
+Add ignore path for tags generation. Use a string or list of strings like:
+
+    let g:erlang_tags_ignore = 'rel'
+    let g:erlang_tags_ignore = ['rel']
+
+Default: doesn't exist.
+
+#### `g:erlang_tags_auto_update`
+
+If exists and set to 1, this plugin will be triggered when an Erlang buffer is
+written. Warning: this may cost lots of CPU if you have a large project. Note
+that it might not work on Windows.
+
+Default: doesn't exist.
+
+#### `g:erlang_tags_outfile`
+
+This option specifies the name of the generated tags file. By default, the
+output file will be `./tags`.
+
 ### Automating generating tags
 
 To keep the tags file up-to-date you can re-run these commands periodically, or
