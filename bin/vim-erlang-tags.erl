@@ -242,9 +242,9 @@ process_dir_tree(Top, Tags) ->
                     RelFileNames = [filename:join(Top, FileName) ||
                                     FileName <- FileNames],
                     process_filenames(RelFileNames, Tags);
-                eacces ->
+                {error, eacces} ->
                     log_error("Permission denied: ~s~n", [Top]);
-                enoent ->
+                {error, enoent} ->
                     log_error("Directory does not exist: ~s~n", [Top])
             end
     end.
