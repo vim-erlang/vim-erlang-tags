@@ -141,4 +141,5 @@ function! VimErlangTagsDefineMappings()
     nnoremap <buffer> g<c-]>        :call VimErlangTagsSelect(0)<cr>g<c-]>
     nnoremap <buffer> <c-w><c-]>    :call VimErlangTagsSelect(1)<cr><c-]>
     nnoremap <buffer> <c-w>]        :call VimErlangTagsSelect(1)<cr><c-]>
+    nnoremap <buffer> <c-w>g<c-]>   :call VimErlangTagsSelect(1)<cr>g<c-]>
 endfunction
