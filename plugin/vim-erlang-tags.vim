@@ -54,10 +54,7 @@ function! VimErlangTags()
 endfunction
 
 function! AsyncVimErlangTags(...)
-    let param = ""
-    for elem in a:000
-        let param = param . " " . elem
-    endfor
+    let param = join(a:000, " ")
     let exec_cmd = s:GetExecuteCmd()
     call system(exec_cmd . " " . param . " " . '&')
 endfunction
