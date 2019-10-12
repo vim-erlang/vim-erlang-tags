@@ -259,98 +259,61 @@ expand_dirs_or_filenames(FileName) ->
 
 %%%=============================================================================
 %%% Create tags from directory trees and file lists
-%%%=============================================================================
+%%%================================================================================================
 
-% Read the given Erlang source files and return an ets table that contains the
-% appropriate tags.
-create_tags(Files) ->
-    Tags = ets:new(tags, [ordered_set]),
-    log("Tags table created.~n"),
+% Read the given Erlang source files and return an ets table that contains the appropriate tags.
+-spec create_tags([file:filename()]) -> ets:tid().
+create_tags(Explore) ->
+    log("In create_tags, To explore: ~p~n", [Explore]),
+    EtsTags = ets:new(tags,
+                      [set,
+                       public,
+                       {write_concurrency,true},
+                       {read_concurrency,false}
+                      ]),
+    log("EtsTags table created.~n"),
+    log("Starting processing of files~n"),
+    Processes = process_filenames(Explore, EtsTags, []),
+    lists:foreach(
+      fun({Pid, Ref}) ->
+              receive
+                  {'DOWN', Ref, process, Pid, normal} -> ok
+              after 5000 -> error("Some process takes to long")
+              end
+      end,
+      Processes),
+    EtsTags.
 
-    {StdIn, RealFiles} =
-        lists:partition(
-          fun(stdin) -> true;
-             (_) -> false
-          end, Files),
 
-    case StdIn of
-        [] ->
-            ok;
-        _ ->
-            process_filenames_from_stdin(Tags)
-    end,
-
-    process_filenames(RealFiles, Tags),
-
-    Tags.
-
-% Read file names for stdin and scan the files for tags.
-process_filenames_from_stdin(Tags) ->
-    case io:get_line(standard_io, "") of
-        eof ->
-            ok;
-        Line ->
-            File = trim(Line),
-            log("File to process: ~s~n", [File]),
-            add_tags_from_file(File, Tags),
-            process_filenames_from_stdin(Tags)
-    end.
-
-% Traverse the given directory and scan the Erlang files inside for tags.
-process_dir_tree(Top, Tags) ->
-    IsIgnored = lists:member(Top, get(ignored)),
-    if IsIgnored -> ok;
-       true ->
-            case file:list_dir(Top) of
-                {ok, FileNames} ->
-                    RelFileNames = [filename:join(Top, FileName) ||
-                                    FileName <- FileNames],
-                    process_filenames(RelFileNames, Tags);
-                {error, eacces} ->
-                    log_error("Permission denied: ~s~n", [Top]);
-                {error, enoent} ->
-                    log_error("Directory does not exist: ~s~n", [Top])
-            end
-    end.
-
-% Go through the given files: scan the Erlang files for tags and traverse the
-% directories for further Erlang files.
-process_filenames([], _Tags) ->
-    ok;
-process_filenames([File|OtherFiles], Tags) ->
-    IsIgnored = lists:member(File, get(ignored)),
-    if IsIgnored -> ok;
-       true ->
-            case filelib:is_dir(File) of
-                true ->
-                    process_dir_tree(File, Tags);
-                false ->
-                    case filename:extension(File) of
-                        Ext when Ext == ".erl";
-                                 Ext == ".hrl" ->
-                            add_tags_from_file(File, Tags);
-                        _ ->
-                            ok
-                    end
-            end
-    end,
-    process_filenames(OtherFiles, Tags).
+% Go through the given files: scan the Erlang files for tags
+% Here we now for sure that `Files` are indeed files with extensions *.erl or *.hrl.
+-spec process_filenames(Files, EtsTags, Processes) -> RetProcesses when
+      Files :: [file:filename()],
+      EtsTags :: ets:tid(),
+      Processes :: [{pid(), reference()}],
+      RetProcesses :: [{pid(), reference()}].
+process_filenames([], _Tags, Processes) ->
+    Processes;
+process_filenames([File|OtherFiles], EtsTags, Processes) ->
+    Verbose = get(verbose),
+    P = spawn_monitor(fun() -> add_tags_from_file(File, EtsTags, Verbose) end),
+    process_filenames(OtherFiles, EtsTags, [P | Processes]).
 
 %%%=============================================================================
 %%% Scan a file or line for tags
 %%%=============================================================================
 
-% Read the given Erlang source file and add the appropriate tags to the Tags ets
-% table.
-add_tags_from_file(File, Tags) ->
+% Read the given Erlang source file and add the appropriate tags to the EtsTags ets table.
+add_tags_from_file(File, EtsTags, Verbose) ->
+    put(verbose, Verbose),
     log("~nProcessing file: ~s~n", [File]),
 
     BaseName = filename:basename(File), % e.g. "mymod.erl"
     ModName = filename:rootname(BaseName), % e.g. "mymod"
-    add_file_tag(Tags, File, BaseName, ModName),
+    add_file_tag(EtsTags, File, BaseName, ModName),
 
     case file:read_file(File) of
-        {ok, Contents} -> ok = scan_tags(Contents, {Tags, File, ModName});
+        {ok, Contents} -> ok = scan_tags(Contents, {EtsTags, File, ModName});
         Err -> log_error("File ~s not readable: ~p~n", [File, Err])
     end.
 
