@@ -127,7 +127,7 @@ function! UpdateTags()
   let temptags = cwd . "/temptags"
   let exec_cmd = s:GetExecuteCmd()
   call DelTagOfFile(f)
-  let param = " --output " . temptags . f
+  let param = " --include " . f . " --output " . temptags
   call VimErlangTags(param)
   let cmd = "tail -n +2 " . temptags . " | sort -o " . tagfilename . " -m -u " . tagfilename . " - "
   let resp = system(cmd)
