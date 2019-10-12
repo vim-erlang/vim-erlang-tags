@@ -65,6 +65,13 @@ if exists("g:erlang_tags_auto_update") && g:erlang_tags_auto_update == 1
     au BufWritePost *.erl,*.hrl call AsyncVimErlangTags()
 endif
 
+if exists("g:erlang_tags_auto_update_current") && g:erlang_tags_auto_update_current == 1
+    augroup vimErlangMaps
+        au!
+        autocmd BufWritePost *.erl,*.hrl call UpdateTags()
+    augroup end
+endif
+
 function! VimErlangTagsSelect(split)
     if a:split
         split
@@ -86,6 +93,44 @@ function! VimErlangTagsSelect(split)
         " function name.
         normal ov"_viwo
     endif
+endfunction
+
+if !exists("s:os")
+    if has("win64") || has("win32") || has("win16")
+        let s:os = "Windows"
+    else
+        let s:os = substitute(system('uname'), '\n', '', '')
+    endif
+endif
+
+" https://vim.fandom.com/wiki/Autocmd_to_update_ctags_file
+function! DelTagOfFile(file)
+  let fullpath = a:file
+  let cwd = getcwd()
+  let tagfilename = cwd . "/tags"
+  let f = substitute(fullpath, cwd . "/", "", "")
+  let f = escape(f, './')
+  let cmd = ""
+  if s:os == "Darwin"
+      let cmd = 'sed -i "" "/' . f . '/d" "' . tagfilename . '"'
+  elseif s:os == "Linux"
+      let cmd = 'sed -i "/' . f . '/d" "' . tagfilename . '"'
+  endif
+  return system(cmd)
+endfunction
+
+function! UpdateTags()
+  let f0 = expand("%:p")
+  let cwd = getcwd()
+  let f = substitute(f0, cwd . "/", "", "")
+  let tagfilename = cwd . "/tags"
+  let temptags = cwd . "/temptags"
+  let exec_cmd = s:GetExecuteCmd()
+  call DelTagOfFile(f)
+  let param = " --output " . temptags . f
+  call VimErlangTags(param)
+  let cmd = "tail -n +2 " . temptags . " | sort -o " . tagfilename . " -m -u " . tagfilename . " - "
+  let resp = system(cmd)
 endfunction
 
 function! VimErlangTagsDefineMappings()
