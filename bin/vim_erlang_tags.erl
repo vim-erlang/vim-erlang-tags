@@ -33,47 +33,36 @@
 %%% Examples of entries (and the tags output generated from them):
 %%%
 %%%     {ErlFileName, FilePath, global, $F} -> TagAddress
-%%%
 %%%         myfile.erl  ./myfile.erl  1;"  F
 %%%
 %%%     {HrlFileName, FilePath, global, $F} -> TagAddress
-%%%
 %%%         myfile.hrl  ./myfile.hrl  1;"  F
 %%%
 %%%     {ModName, FilePath, global, $M} -> TagAddress
-%%%
 %%%         myfile  ./myfile.erl  1;"  M
 %%%
 %%%     {FuncName, FilePath, local, $f} -> TagAddress
-%%%
 %%%         f  ./mymod.erl  /^f\>/;"  f  file:
 %%%
 %%%     {FuncName, FilePath, global, $f} -> TagAddress
-%%%
 %%%         mymod:f  ./mymod.erl  /^f\>/;"  f
 %%%
 %%%     {Type, FilePath, local, $t} -> TagAddress
-%%%
 %%%         mytype  ./mymod.erl  /^-type\s\*\<mytype\>/;"  t  file:
 %%%
 %%%     {Type, FilePath, global, $t} -> TagAddress
-%%%
 %%%         mymod:mytype  ./mymod.erl  /^-type\s\*\<mytype\>/;"  t
 %%%
 %%%     {Record, FilePath, local, $r} -> TagAddress
-%%%
 %%%         myrec  ./mymod.erl  /^-record\s\*\<myrec\>/;"  r  file:
 %%%
 %%%     {Record, FilePath, global, $r} -> TagAddress
-%%%
 %%%         myrec  ./myhrl.hrl  /^-record\s\*\<myrec\>/;"  r
 %%%
 %%%     {Macro, FilePath, local, $d} -> TagAddress
-%%%
 %%%         mymac  ./mymod.erl  /^-define\s\*\<mymac\>/;"  d  file:
 %%%
 %%%     {Macro, FilePath, global, $d} -> TagAddress
-%%%
 %%%         mymac  ./myhrl.hrl  /^-define\s\*\<mymac\>/;"  d
 
 -mode(compile).
