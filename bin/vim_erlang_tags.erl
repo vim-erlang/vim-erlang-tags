@@ -80,6 +80,55 @@
 
 -define(DEFAULT_PATH, ".").
 
+%%%=============================================================================
+%%% Parameter types, maps, defaults
+%%%============================================================================
+-type cmd_param() :: include | ignore | output | otp | verbose | help.
+-type cmd_line_arg() :: string().
+-type cmd_line_arguments() :: [cmd_line_arg()].
+-type parsed_params() ::
+    #{include := list(string()),
+      ignore := list(string()),
+      output := list(string()),
+      otp := boolean(),
+      verbose := boolean(),
+      help := boolean()
+     }.
+-define(DEFAULT_PARSED_PARAMS,
+        #{include => [],
+          ignore => [],
+          output => [],
+          otp => false,
+          verbose => false,
+          help => false}).
+
+-type config() ::
+    #{explore := list(file:filename()),
+      output := file:filename()
+     }.
+
+-spec allowed_cmd_params() -> [{cmd_param(), cmd_line_arguments()}].
+allowed_cmd_params() ->
+    [
+     {include, ["-i", "--include", "--"]},
+     {ignore,  ["-g", "--ignore"]},
+     {output,  ["-o", "--output"]},
+     {otp,     ["-p", "--otp"]},
+     {verbose, ["-v", "--verbose"]},
+     {help,    ["-h", "--help"]}
+    ].
+
+-type command_type() :: stateful | boolean.
+-spec get_command_type(Cmd :: cmd_param()) -> command_type().
+get_command_type(C) when C =:= include;
+                         C =:= ignore;
+                         C =:= output ->
+    stateful;
+get_command_type(B) when B =:= otp;
+                         B =:= verbose;
+                         B =:= help ->
+    boolean.
+
 main(Args) ->
     % Process arguments
     put(files, []),
