@@ -21,7 +21,7 @@ endif
 
 autocmd FileType erlang call VimErlangTagsDefineMappings()
 
-let s:exec_script = expand('<sfile>:p:h') . "/../bin/vim-erlang-tags.erl"
+let s:exec_script = expand('<sfile>:p:h') . "/../bin/vim_erlang_tags.erl"
 
 function! s:GetExecuteCmd()
     let script_opts = ""
