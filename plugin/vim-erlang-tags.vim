@@ -42,14 +42,14 @@ function! s:GetExecuteCmd()
     return s:exec_script . script_opts
 endfunction
 
-function! VimErlangTags()
+function! VimErlangTags(...)
+    let param = join(a:000, " ")
     let exec_cmd = s:GetExecuteCmd()
-
-    let script_output = system(exec_cmd)
+    let script_output = system(exec_cmd . " " . param)
     if !v:shell_error
         return 0
     else
-        echoerr "vim-erlang-tag " . script_output
+        echoerr "vim-erlang-tag failed with: " . script_output
     endif
 endfunction
 
