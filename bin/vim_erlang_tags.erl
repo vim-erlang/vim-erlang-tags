@@ -22,7 +22,7 @@
 %%% - http://ctags.sourceforge.net/FORMAT
 %%% - http://vimdoc.sourceforge.net/htmldoc/tagsrch.html#tags-file-format
 
-%%% The Tags ets table has the following scheme:
+%%% The EtsTags ets table has the following scheme:
 %%%
 %%%     {{TagName, FilePath, Scope, Kind}, TagAddress}
 %%%
@@ -317,35 +317,35 @@ add_tags_from_file(File, EtsTags, Verbose) ->
         Err -> log_error("File ~s not readable: ~p~n", [File, Err])
     end.
 
-scan_tags(Contents, {Tags, File, ModName}) ->
+scan_tags(Contents, {EtsTags, File, ModName}) ->
     scan_tags_core(
       Contents, ?RE_FUNCTIONS,
       fun([_, FuncName]) ->
-              add_func_tags(Tags, File, ModName, FuncName)
+              add_func_tags(EtsTags, File, ModName, FuncName)
       end),
     scan_tags_core(
       Contents, ?RE_TYPESPECS1,
       fun([_, Attr, TypeName]) ->
               InnerPattern = [TypeName, "\\>"],
-              add_type_tags(Tags, File, ModName, Attr, TypeName, InnerPattern)
+              add_type_tags(EtsTags, File, ModName, Attr, TypeName, InnerPattern)
       end),
     scan_tags_core(
       Contents, ?RE_TYPESPECS2,
       fun([_, Attr, TypeName]) ->
               InnerPattern = [$', TypeName, $'],
-              add_type_tags(Tags, File, ModName, Attr, TypeName, InnerPattern)
+              add_type_tags(EtsTags, File, ModName, Attr, TypeName, InnerPattern)
       end),
     scan_tags_core(
       Contents, ?RE_DEFINES1,
       fun([_, Attr, Name]) ->
               InnerPattern = [Name, "\\>"],
-              add_record_or_macro_tag(Tags, File, Attr, Name, InnerPattern)
+              add_record_or_macro_tag(EtsTags, File, Attr, Name, InnerPattern)
       end),
     scan_tags_core(
       Contents, ?RE_DEFINES2,
       fun([_, Attr, Name]) ->
               InnerPattern = [$', Name, $'],
-              add_record_or_macro_tag(Tags, File, Attr, Name, InnerPattern)
+              add_record_or_macro_tag(EtsTags, File, Attr, Name, InnerPattern)
       end),
     ok.
 
@@ -361,37 +361,37 @@ scan_tags_core(Contents, Pattern, Fun) ->
 %%% Add specific tags
 %%%=============================================================================
 
-% Add this information to Tags.
-add_file_tag(Tags, File, BaseName, ModName) ->
+% Add this information to EtsTags.
+add_file_tag(EtsTags, File, BaseName, ModName) ->
 
     % myfile.hrl <tab> ./myfile.hrl <tab> 1;"  F
     % myfile.erl <tab> ./myfile.erl <tab> 1;"  F
     % myfile <tab> ./myfile.erl <tab> 1;"  M
-    add_tag(Tags, BaseName, File, "1", global, $F),
+    add_tag(EtsTags, BaseName, File, "1", global, $F),
 
     case filename:extension(File) of
         ".erl" ->
-            add_tag(Tags, ModName, File, "1", global, $M);
+            add_tag(EtsTags, ModName, File, "1", global, $M);
         _ ->
             ok
     end.
 
-% File contains the function ModName:FuncName; add this information to Tags.
-add_func_tags(Tags, File, ModName, FuncName) ->
+% File contains the function ModName:FuncName; add this information to EtsTags.
+add_func_tags(EtsTags, File, ModName, FuncName) ->
 
     log("Function definition found: ~s~n", [FuncName]),
 
     % Global entry:
     % mymod:f <tab> ./mymod.erl <tab> /^f\>/
-    add_tag(Tags, [ModName, ":", FuncName], File, ["/^", FuncName, "\\>/"],
+    add_tag(EtsTags, [ModName, ":", FuncName], File, ["/^", FuncName, "\\>/"],
             global, $f),
 
     % Static (or local) entry:
     % f <tab> ./mymod.erl <tab> /^f\>/ <space><space> ;" <tab> file:
-    add_tag(Tags, FuncName, File, ["/^", FuncName, "\\>/"], local, $f).
+    add_tag(EtsTags, FuncName, File, ["/^", FuncName, "\\>/"], local, $f).
 
-% File contains the type ModName:Type; add this information to Tags.
-add_type_tags(Tags, File, ModName, Attribute, TypeName, InnerPattern) ->
+% File contains the type ModName:Type; add this information to EtsTags.
+add_type_tags(EtsTags, File, ModName, Attribute, TypeName, InnerPattern) ->
 
     log("Type definition found: ~s~n", [TypeName]),
 
@@ -400,17 +400,17 @@ add_type_tags(Tags, File, ModName, Attribute, TypeName, InnerPattern) ->
     % Global entry:
     % mymod:mytype <tab> ./mymod.erl <tab> /^-type\s\*mytype\>/
     % mymod:mytype <tab> ./mymod.erl <tab> /^-opaque\s\*mytype\>/
-    add_tag(Tags, [ModName, ":", TypeName], File, Pattern, global, $t),
+    add_tag(EtsTags, [ModName, ":", TypeName], File, Pattern, global, $t),
 
     % Static (or local) entry:
     % mytype <tab> ./mymod.erl <tab> /^-type\s\*mytype\>/
     %     <space><space> ;" <tab> file:
     % mytype <tab> ./mymod.erl <tab> /^-opaque\s\*mytype\>/
     %     <space><space> ;" <tab> file:
-    add_tag(Tags, TypeName, File, Pattern, local, $t).
+    add_tag(EtsTags, TypeName, File, Pattern, local, $t).
 
-% File contains a macro or record called Name; add this information to Tags.
-add_record_or_macro_tag(Tags, File, Attribute, Name, InnerPattern) ->
+% File contains a macro or record called Name; add this information to EtsTags.
+add_record_or_macro_tag(EtsTags, File, Attribute, Name, InnerPattern) ->
 
     {Kind, Prefix} =
         case Attribute of
@@ -434,7 +434,7 @@ add_record_or_macro_tag(Tags, File, Attribute, Name, InnerPattern) ->
     % myrec  ./myhrl.hrl  /^-record\s\*\<myrec\>/;"  r
     % mymac  ./mymod.erl  /^-define\s\*\<mymac\>/;"  m  file:
     % mymac  ./myhrl.hrl  /^-define\s\*\<mymac\>/;"  m
-    add_tag(Tags, Name, File,
+    add_tag(EtsTags, Name, File,
             ["/^-\\s\\*", Attribute, "\\s\\*(\\?\\s\\*", InnerPattern, "/"],
             Scope, Kind),
 
@@ -442,20 +442,21 @@ add_record_or_macro_tag(Tags, File, Attribute, Name, InnerPattern) ->
     % #myrec  ./myhrl.hrl  /^-record\s\*\<myrec\>/;"  r
     % ?mymac  ./mymod.erl  /^-define\s\*\<mymac\>/;"  m  file:
     % ?mymac  ./myhrl.hrl  /^-define\s\*\<mymac\>/;"  m
-    add_tag(Tags, [Prefix|Name], File,
+    add_tag(EtsTags, [Prefix|Name], File,
             ["/^-\\s\\*", Attribute, "\\s\\*(\\?\\s\\*", InnerPattern, "/"],
             Scope, Kind).
 
-add_tag(Tags, Tag, File, TagAddress, Scope, Kind) ->
-    ets:insert_new(Tags, {{Tag, File, Scope, Kind}, TagAddress}).
+add_tag(EtsTags, Tag, File, TagAddress, Scope, Kind) ->
+    ets:insert_new(EtsTags, {{Tag, File, Scope, Kind}, TagAddress}).
 
 %%%=============================================================================
 %%% Writing tags into a file
 %%%=============================================================================
 
-tags_to_file(Tags, TagsFile) ->
+tags_to_file(EtsTags, TagsFile) ->
     Header = "!_TAG_FILE_SORTED\t1\t/0=unsorted, 1=sorted/\n",
-    Entries = lists:sort([tag_to_binary(Entry) || Entry <- ets:tab2list(Tags)]),
+    Entries = lists:sort(
+                [tag_to_binary(Entry) || Entry <- ets:tab2list(EtsTags)]),
     file:write_file(TagsFile, [Header, Entries]),
     ok.
 
@@ -475,13 +476,8 @@ tag_to_binary({{Tag, File, Scope, Kind}, TagAddress}) ->
 %%% Utility functions
 %%%=============================================================================
 
-% From http://www.trapexit.org/Trimming_Blanks_from_String
-trim(Input) ->
-    re:replace(Input, "\\s*$", "", [{return, list}]).
-
 log(Format) ->
     log(Format, []).
-
 log(Format, Data) ->
     case get(verbose) of
         true ->
