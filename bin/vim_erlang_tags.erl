@@ -200,37 +200,6 @@ parse_args([FileName|OtherArgs]) ->
     put(files, [FileName|get(files)]),
     parse_args(OtherArgs).
 
-print_help() ->
-    Help =
-"Usage: vim-erlang-tags.erl [-h|--help] [-v|--verbose] [-] [-o|--output FILE]
-                            DIR_OR_FILE...
-
-Description:
-  vim-erlang-tags.erl creates a tags file that can be used by Vim. The
-  directories given as arguments are searched (recursively) for *.erl and *.hrl
-  files, which will be scanned. The files given as arguments are also scanned.
-  The default is to search in the current directory.
-
-Options:
-  -h, --help    Print help and exit.
-  -v, --verbose Verbose output.
-  -             Read the list of files from the standard input.
-  -o, --output FILE
-                Write the output into the given file instead of ./tags.
-  -i, --ignore FILE_WILDCARD
-                Ignore the files/directories that match the given wildcard.
-                Read http://www.erlang.org/doc/man/filelib.html#wildcard-1 for
-                the wildcard patterns.
-  -p, --otp     Include the currently used OTP lib_dir
-
-Example:
-  $ vim-erlang-tags.erl
-  $ vim-erlang-tags.erl .  # Same
-  $ find . -name '*.[he]rl' | vim-erlang-tags.erl -  # Equivalent to the above
-  $ vim-erlang-tags.erl /path/to/project1 /path/to/project2
-",
-    io:format("~s", [Help]).
-
 %%%=============================================================================
 %%% Create tags from directory trees and file lists
 %%%=============================================================================
@@ -473,16 +442,14 @@ tags_to_file(Tags, TagsFile) ->
 tag_to_binary({{Tag, File, Scope, Kind}, TagAddress}) ->
     ScopeStr =
     case Scope of
-        global ->
-            "";
-        local ->
-            "\tfile:"
+        global -> "";
+        local -> "\tfile:"
     end,
-    iolist_to_binary( [Tag, "\t",
-                       File, "\t",
-                       TagAddress, ";\"\t",
-                       Kind,
-                       ScopeStr, "\n"]).
+    iolist_to_binary([Tag, "\t",
+                      File, "\t",
+                      TagAddress, ";\"\t",
+                      Kind,
+                      ScopeStr, "\n"]).
 
 %%%=============================================================================
 %%% Utility functions
@@ -503,9 +470,36 @@ log(Format, Data) ->
             ok
     end.
 
-%log_error(Format) ->
-%    log_error(Format, []).
-
 log_error(Format, Data) ->
     io:format(standard_error, Format, Data).
 
+print_help() ->
+    Help =
+"Usage: vim-erlang-tags.erl [-h|--help] [-v|--verbose] [-] [-o|--output FILE]
+                            DIR_OR_FILE...
+
+Description:
+  vim-erlang-tags.erl creates a tags file that can be used by Vim. The
+  directories given as arguments are searched (recursively) for *.erl and *.hrl
+  files, which will be scanned. The files given as arguments are also scanned.
+  The default is to search in the current directory.
+
+Options:
+  -h, --help    Print help and exit.
+  -v, --verbose Verbose output.
+  -             Read the list of files from the standard input.
+  -o, --output FILE
+                Write the output into the given file instead of ./tags.
+  -i, --ignore FILE_WILDCARD
+                Ignore the files/directories that match the given wildcard.
+                Read http://www.erlang.org/doc/man/filelib.html#wildcard-1 for
+                the wildcard patterns.
+  -p, --otp     Include the currently used OTP lib_dir
+
+Example:
+  $ vim-erlang-tags.erl
+  $ vim-erlang-tags.erl .  # Same
+  $ find . -name '*.[he]rl' | vim-erlang-tags.erl -  # Equivalent to the above
+  $ vim-erlang-tags.erl /path/to/project1 /path/to/project2
+",
+    io:format("~s", [Help]).
