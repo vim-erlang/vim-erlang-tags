@@ -130,75 +130,132 @@ get_command_type(B) when B =:= otp;
     boolean.
 
 main(Args) ->
-    % Process arguments
-    put(files, []),
-    put(tagsfilename, "tags"),
-    put(ignored, []),
-    put(incl_otp, false),
-    parse_args(Args),
-    ArgFiles =
-        case get(files) of
-            [] ->
-                [?DEFAULT_PATH];
-            Other ->
-                Other
+    log("Entering main. Args are ~p~n~n", [Args]),
+    ParsedArgs = reparse_args(?DEFAULT_PARSED_PARAMS, Args),
+    set_verbose_flag(ParsedArgs),
+    Opts = clean_opts(ParsedArgs),
+    run(Opts).
+
+run(#{help := true}) ->
+    print_help();
+run(#{explore := Explore, output := TagFile}) ->
+    EtsTags = create_tags(Explore),
+    ok = tags_to_file(EtsTags, TagFile),
+    ets:delete(EtsTags).
+
+set_verbose_flag(#{verbose := Verbose}) ->
+    put(verbose, Verbose),
+    log("Verbose mode on.~n").
+
+-spec reparse_args(parsed_params(), cmd_line_arguments()) -> parsed_params().
+reparse_args(Opts, []) ->
+    Opts;
+reparse_args(Opts, AllArgs) ->
+    {Param, ToContinueParsing} = parse_next_arg(AllArgs),
+    {ParamState, NextArgs} =
+        case get_command_type(Param) of
+            boolean ->
+                {true, ToContinueParsing};
+            stateful ->
+                get_full_arg_state(
+                  Param, maps:get(Param, Opts, []), ToContinueParsing)
         end,
+    reparse_args(Opts#{Param := ParamState}, NextArgs).
 
-    Files =
-        case get(incl_otp) of
-            true -> [code:lib_dir()|ArgFiles];
-            false -> ArgFiles
-        end,
+-spec parse_next_arg(nonempty_list(cmd_line_arg())) ->
+    {cmd_param(), cmd_line_arguments()}.
+parse_next_arg([Arg | NextArgs] = AllArgs) ->
+    lists:foldl(
+      fun({Param, ParamList}, Acc) ->
+              case lists:member(Arg, ParamList) of
+                  true -> {Param, NextArgs};
+                  _ -> Acc
+              end
+      end, %% If the parameter is not recognised, just throw it into include
+      {include, AllArgs},
+      allowed_cmd_params()).
 
-    Tags = create_tags(Files),
-    ok = tags_to_file(Tags, get(tagsfilename)),
-    ets:delete(Tags).
-
-%% I know that using the process dictionary is not very nice...
-parse_args([]) ->
-    ok;
-parse_args(["-"|OtherArgs]) ->
-    put(files, [stdin|get(files)]),
-    parse_args(OtherArgs);
-parse_args([Help|_]) when Help == "-h";
-                          Help == "--help" ->
-    print_help(),
-    halt(0);
-parse_args([Verbose|OtherArgs]) when Verbose == "-v";
-                                     Verbose == "--verbose" ->
-    put(verbose, true),
-    log("Verbose mode on.~n"),
-    parse_args(OtherArgs);
-parse_args([InclOTP|OtherArgs]) when InclOTP == "-p";
-                                     InclOTP == "--otp" ->
-    put(incl_otp, true),
-    log("Including OTP in.~n"),
-    parse_args(OtherArgs);
-parse_args([Output, TagsFileName|OtherArgs]) when Output == "-o";
-                                                  Output == "--output" ->
-    put(tagsfilename, TagsFileName),
-    parse_args(OtherArgs);
-parse_args([Output]) when Output == "-o";
-                          Output == "--output";
-                          Output == "-i";
-                          Output == "--ignore" ->
-    log_error("More argument needed after ~s.~n", [Output]),
-    halt(1);
-parse_args([Ignored, Name|OtherArgs]) when Ignored == "-i";
-                                           Ignored == "--ignore" ->
-    Files = filelib:wildcard(Name),
-    AllIgnored = case get(ignored) of
-        undefined -> Files;
-        OldFiles -> OldFiles ++ [ filename:absname(N, ?DEFAULT_PATH) || N <- Files ]
+%% Return args for the current parameter,
+%% and the rest of the args to continue parsing
+-spec get_full_arg_state(Param, CurrentParamState, ToContinueParsing) -> Ret
+    when Param :: cmd_param(),
+         CurrentParamState :: cmd_line_arguments(),
+         ToContinueParsing :: cmd_line_arguments(),
+         Ret :: {boolean(), cmd_line_arguments()}
+         | {cmd_line_arguments(), cmd_line_arguments()}.
+get_full_arg_state(Param, _CurrentParamState, ToContinueParsing)
+  when Param =:= otp; Param =:= help; Param =:= verbose ->
+    {true, ToContinueParsing};
+get_full_arg_state(Param, CurrentParamState, ToContinueParsing) ->
+    log("Parsing args for parameter ~p~n", [Param]),
+    {StateArgs, Rest} = consume_until_new_command(ToContinueParsing),
+    case StateArgs of
+        [] -> log_error("Arguments needed for ~s.~n", [Param]);
+        _ -> ok
     end,
-    put(ignored, AllIgnored),
-    parse_args(OtherArgs);
-parse_args(["-" ++ Arg|_]) ->
-    log_error("Unknown argument: ~s~n", [Arg]),
-    halt(1);
-parse_args([FileName|OtherArgs]) ->
-    put(files, [FileName|get(files)]),
-    parse_args(OtherArgs).
+    {StateArgs ++ CurrentParamState, Rest}.
+
+-spec consume_until_new_command(Args) -> {ConsumedArgs, RestArgs} when
+      Args :: cmd_line_arguments(),
+      ConsumedArgs :: cmd_line_arguments(),
+      RestArgs :: cmd_line_arguments().
+consume_until_new_command(Args) ->
+    log("    Consuming args ~p~n", [Args]),
+    States = lists:foldl(
+               fun({_,S}, Acc) -> S ++ Acc end, [], allowed_cmd_params()),
+    lists:splitwith(
+      fun("-" ++ _ = El) ->
+              case lists:member(El, States) of
+                  true -> false;
+                  _ -> log_error("Unknown argument: ~s~n", [El]), halt(1)
+              end;
+         (_El) ->
+              true
+      end, Args).
+
+-spec clean_opts(parsed_params()) -> config().
+clean_opts(#{help := true}) ->
+    #{help => true};
+clean_opts(#{include := []} = Opts0) ->
+    log("Set includes to default current dir.~n"),
+    clean_opts(Opts0#{include := [?DEFAULT_PATH]});
+clean_opts(#{otp := true, include := Inc} = Opts0) ->
+    log("Including OTP in.~n"),
+    AllIncludes = [code:lib_dir() | Inc],
+    Opts1 = maps:update(include, AllIncludes, Opts0),
+    Opts2 = maps:update(otp, false, Opts1),
+    clean_opts(Opts2);
+clean_opts(#{output := []} = Opts0) ->
+    log("Set output to default 'tags'.~n"),
+    clean_opts(Opts0#{output := ["tags"]});
+clean_opts(#{include := Included, ignore := Ignored, output := [Output]}) ->
+    log("Set includes to default current dir.~n"),
+    #{explore => to_explore_as_include_minus_ignored(Included, Ignored),
+      output => Output}.
+
+%% This function expands all the paths given in included and in ignored to
+%% actual filenames, and then subtracts the excluded ones from the included
+-spec to_explore_as_include_minus_ignored([string()], [string()]) ->
+    [file:filename()].
+to_explore_as_include_minus_ignored(Included, Ignored) ->
+    AllIncluded = lists:append(expand_dirs(Included)),
+    AllIgnored = lists:append(expand_dirs(Ignored)),
+    lists:subtract(AllIncluded, AllIgnored).
+
+-spec expand_dirs([string()]) -> [file:filename()].
+expand_dirs(Included) ->
+    lists:map(fun expand_dirs_or_filenames/1, Included).
+
+-spec expand_dirs_or_filenames(string()) -> [file:filename()].
+expand_dirs_or_filenames(FileName) ->
+    case {filelib:is_file(FileName), filelib:is_dir(FileName)} of
+        {false, _} ->
+            log_error("File \"~p\" is not a proper file.~n", [FileName]),
+            [];
+        {true, true} ->
+                    filelib:wildcard(FileName ++ "/**/*.{erl,hrl}");
+        _ -> [FileName]
+    end.
 
 %%%=============================================================================
 %%% Create tags from directory trees and file lists
@@ -435,7 +492,7 @@ add_tag(Tags, Tag, File, TagAddress, Scope, Kind) ->
 
 tags_to_file(Tags, TagsFile) ->
     Header = "!_TAG_FILE_SORTED\t1\t/0=unsorted, 1=sorted/\n",
-    Entries = lists:sort( [ tag_to_binary(Entry) || Entry <- ets:tab2list(Tags) ] ),
+    Entries = lists:sort([tag_to_binary(Entry) || Entry <- ets:tab2list(Tags)]),
     file:write_file(TagsFile, [Header, Entries]),
     ok.
 
