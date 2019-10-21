@@ -81,6 +81,16 @@ that it might not work on Windows.
 
 Default: doesn't exist.
 
+#### `g:erlang_tags_auto_update_current`
+
+If exists and set to 1, this plugin will be triggered when an Erlang buffer is
+written. In this case, it will attempt to update only the currently modified
+file. As a limitation, this will consider that your `tags` file is on the
+current directory, as returned by vim's `getcwd()`.
+Note that it might not work on Windows.
+
+Default: doesn't exist.
+
 #### `g:erlang_tags_outfile`
 
 This option specifies the name of the generated tags file. By default, the
