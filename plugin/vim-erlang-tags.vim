@@ -22,6 +22,7 @@ endif
 autocmd FileType erlang call VimErlangTagsDefineMappings()
 
 let s:exec_script = expand('<sfile>:p:h') . "/../bin/vim_erlang_tags.erl"
+let s:otppath_cmd = 'erl -noinput -eval ''io:format("~ts", [code:lib_dir()]), init:stop().'''
 
 function! s:GetExecuteCmd()
     let script_opts = ""
@@ -40,6 +41,17 @@ function! s:GetExecuteCmd()
         let script_opts = script_opts . " --output " . g:erlang_tags_outfile
     endif
     return s:exec_script . script_opts
+endfunction
+
+function! GetOtpTagsPath()
+    let otppath = system(s:otppath_cmd)
+    let otptags = otppath . "/otptags"
+    return otptags
+endfunction
+
+function! AsyncBuildOtpTags()
+    let cmd = '(OTPPATH=`' . s:otppath_cmd . '` && ' . s:exec_script . ' -i $OTPPATH -o $OTPPATH/otptags)'
+    call system(cmd . " &")
 endfunction
 
 function! VimErlangTags(...)
@@ -104,7 +116,7 @@ if !exists("s:os")
 endif
 
 " https://vim.fandom.com/wiki/Autocmd_to_update_ctags_file
-function! DelTagOfFile(file)
+function! s:DelTagOfFile(file)
   let fullpath = a:file
   let cwd = getcwd()
   let tagfilename = cwd . "/tags"

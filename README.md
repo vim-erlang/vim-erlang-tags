@@ -62,6 +62,27 @@ Or within Vim by executing the following command:
 Note that for the latter command, the current working directory will be used
 (`:help pwd` to find out more).
 
+### Generate OTP tags
+
+Often, you might be curious about the implementation of that function from the
+OTP libraries, but `CTRL-t` is not taking you there. We have a solution for
+this:
+
+    call AsyncBuildOtpTags()
+
+This command will find the path to your otp installation, and inside its `lib/`
+folder, it will build a tags file called `otptags`. The next thing you need, is
+to make vim aware of this. That's where the next function comes in place:
+
+    call GetOtpTagsPath()
+
+This will return the path to the generated `otptags` file, wherever this file
+lives. Extract it, and add it to your tags by doing
+
+    let &tags.="," . otptags_path
+
+Where otptags\_path is the expanded path returned previously.
+
 ### Options
 
 #### `g:erlang_tags_ignore`
