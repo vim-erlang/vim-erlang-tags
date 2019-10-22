@@ -503,19 +503,19 @@ Description:
 Options:
   -h, --help    Print help and exit.
   -v, --verbose Verbose output.
-  -             Read the list of files from the standard input.
-  -o, --output FILE
+  -o, --output  FILE
                 Write the output into the given file instead of ./tags.
-  -i, --ignore FILE_WILDCARD
-                Ignore the files/directories that match the given wildcard.
+  -i, --include FILE_WILDCARD
+  -g, --ignore  FILE_WILDCARD
+                Include or ignore the files/directories that match the given wildcard.
                 Read http://www.erlang.org/doc/man/filelib.html#wildcard-1 for
                 the wildcard patterns.
   -p, --otp     Include the currently used OTP lib_dir
 
 Example:
-  $ vim-erlang-tags.erl
-  $ vim-erlang-tags.erl .  # Same
-  $ find . -name '*.[he]rl' | vim-erlang-tags.erl -  # Equivalent to the above
-  $ vim-erlang-tags.erl /path/to/project1 /path/to/project2
+  $ vim_erlang_tags.erl
+  $ vim_erlang_tags.erl .  # Same
+  $ find . -name '*.[he]rl' | vim_erlang_tags.erl -  # Equivalent to the above
+  $ vim_erlang_tags.erl /path/to/project1 /path/to/project2
 ",
     io:format("~s", [Help]).
