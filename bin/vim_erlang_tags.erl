@@ -248,13 +248,19 @@ expand_dirs(Included) ->
 
 -spec expand_dirs_or_filenames(string()) -> [file:filename()].
 expand_dirs_or_filenames(FileName) ->
-    case {filelib:is_file(FileName), filelib:is_dir(FileName)} of
-        {false, _} ->
-            log_error("File \"~p\" is not a proper file.~n", [FileName]),
-            [];
-        {true, true} ->
-                    filelib:wildcard(FileName ++ "/**/*.{erl,hrl}");
-        _ -> [FileName]
+    case {filelib:is_regular(FileName), filelib:is_dir(FileName)} of
+        {true, false} ->
+            [FileName];
+        {false, true} ->
+            filelib:wildcard(FileName ++ "/**/*.{erl,hrl}");
+        {false, false} ->
+            case filelib:wildcard(FileName) of
+                [] ->
+                    log_error("File \"~p\" is not a proper file.~n", [FileName]),
+                    [];
+                [_|_] = FS ->
+                    lists:append(expand_dirs(FS))
+            end
     end.
 
 %%%=============================================================================
