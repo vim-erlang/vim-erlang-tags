@@ -83,29 +83,25 @@
 %%%=============================================================================
 %%% Parameter types, maps, defaults
 %%%============================================================================
+-record(parsed_params,
+    {include = [] :: [string()],
+     ignore  = [] :: [string()],
+     output  = [] :: [string()],
+     otp     = false :: boolean(),
+     verbose = false :: boolean(),
+     help    = false:: boolean()}).
+
+-record(config,
+    {explore :: [file:filename()],
+     output  :: file:filename(),
+     help    :: boolean()}).
+
 -type cmd_param() :: include | ignore | output | otp | verbose | help.
 -type cmd_line_arg() :: string().
 -type cmd_line_arguments() :: [cmd_line_arg()].
--type parsed_params() ::
-    #{include := list(string()),
-      ignore := list(string()),
-      output := list(string()),
-      otp := boolean(),
-      verbose := boolean(),
-      help := boolean()
-     }.
--define(DEFAULT_PARSED_PARAMS,
-        #{include => [],
-          ignore => [],
-          output => [],
-          otp => false,
-          verbose => false,
-          help => false}).
+-type parsed_params() :: #parsed_params{}.
 
--type config() ::
-    #{explore := list(file:filename()),
-      output := file:filename()
-     }.
+-type config() :: #config{}.
 
 -spec allowed_cmd_params() -> [{cmd_param(), cmd_line_arguments()}].
 allowed_cmd_params() ->
@@ -119,6 +115,7 @@ allowed_cmd_params() ->
     ].
 
 -type command_type() :: stateful | boolean.
+
 -spec get_command_type(Cmd :: cmd_param()) -> command_type().
 get_command_type(C) when C =:= include;
                          C =:= ignore;
@@ -131,19 +128,19 @@ get_command_type(B) when B =:= otp;
 
 main(Args) ->
     log("Entering main. Args are ~p~n~n", [Args]),
-    ParsedArgs = reparse_args(?DEFAULT_PARSED_PARAMS, Args),
+    ParsedArgs = reparse_args(#parsed_params{}, Args),
     set_verbose_flag(ParsedArgs),
     Opts = clean_opts(ParsedArgs),
     run(Opts).
 
-run(#{help := true}) ->
+run(#config{help = true}) ->
     print_help();
-run(#{explore := Explore, output := TagFile}) ->
+run(#config{explore = Explore, output = TagFile}) ->
     EtsTags = create_tags(Explore),
     ok = tags_to_file(EtsTags, TagFile),
     ets:delete(EtsTags).
 
-set_verbose_flag(#{verbose := Verbose}) ->
+set_verbose_flag(#parsed_params{verbose = Verbose}) ->
     put(verbose, Verbose),
     log("Verbose mode on.~n").
 
@@ -158,9 +155,23 @@ reparse_args(Opts, AllArgs) ->
                 {true, ToContinueParsing};
             stateful ->
                 get_full_arg_state(
-                  Param, maps:get(Param, Opts, []), ToContinueParsing)
+                  Param, param_get(Param, Opts), ToContinueParsing)
         end,
-    reparse_args(Opts#{Param := ParamState}, NextArgs).
+    reparse_args(param_set(Param, ParamState, Opts), NextArgs).
+
+param_get(include, #parsed_params{include = Include}) -> Include;
+param_get(ignore, #parsed_params{ignore = Ignore}) -> Ignore;
+param_get(output, #parsed_params{output = Output}) -> Output;
+param_get(otp, #parsed_params{otp = Otp}) -> Otp;
+param_get(verbose, #parsed_params{verbose = Verbose}) -> Verbose;
+param_get(help, #parsed_params{help = Help}) -> Help.
+
+param_set(include, Value, PP) -> PP#parsed_params{include = Value};
+param_set(ignore, Value, PP) -> PP#parsed_params{ignore = Value};
+param_set(output, Value, PP) -> PP#parsed_params{output = Value};
+param_set(otp, Value, PP) -> PP#parsed_params{otp = Value};
+param_set(verbose, Value, PP) -> PP#parsed_params{verbose = Value};
+param_set(help, Value, PP) -> PP#parsed_params{help = Value}.
 
 -spec parse_next_arg(nonempty_list(cmd_line_arg())) ->
     {cmd_param(), cmd_line_arguments()}.
@@ -181,11 +192,7 @@ parse_next_arg([Arg | NextArgs] = AllArgs) ->
     when Param :: cmd_param(),
          CurrentParamState :: cmd_line_arguments(),
          ToContinueParsing :: cmd_line_arguments(),
-         Ret :: {boolean(), cmd_line_arguments()}
-         | {cmd_line_arguments(), cmd_line_arguments()}.
-get_full_arg_state(Param, _CurrentParamState, ToContinueParsing)
-  when Param =:= otp; Param =:= help; Param =:= verbose ->
-    {true, ToContinueParsing};
+         Ret :: {cmd_line_arguments(), cmd_line_arguments()}.
 get_full_arg_state(Param, CurrentParamState, ToContinueParsing) ->
     log("Parsing args for parameter ~p~n", [Param]),
     {StateArgs, Rest} = consume_until_new_command(ToContinueParsing),
@@ -214,24 +221,22 @@ consume_until_new_command(Args) ->
       end, Args).
 
 -spec clean_opts(parsed_params()) -> config().
-clean_opts(#{help := true}) ->
-    #{help => true};
-clean_opts(#{include := []} = Opts0) ->
+clean_opts(#parsed_params{help = true}) ->
+    #config{help = true};
+clean_opts(#parsed_params{include = []} = Opts0) ->
     log("Set includes to default current dir.~n"),
-    clean_opts(Opts0#{include := [?DEFAULT_PATH]});
-clean_opts(#{otp := true, include := Inc} = Opts0) ->
+    clean_opts(Opts0#parsed_params{include = [?DEFAULT_PATH]});
+clean_opts(#parsed_params{otp = true, include = Inc} = Opts0) ->
     log("Including OTP in.~n"),
     AllIncludes = [code:lib_dir() | Inc],
-    Opts1 = maps:update(include, AllIncludes, Opts0),
-    Opts2 = maps:update(otp, false, Opts1),
-    clean_opts(Opts2);
-clean_opts(#{output := []} = Opts0) ->
+    clean_opts(Opts0#parsed_params{include = AllIncludes, otp = false});
+clean_opts(#parsed_params{output = []} = Opts0) ->
     log("Set output to default 'tags'.~n"),
-    clean_opts(Opts0#{output := ["tags"]});
-clean_opts(#{include := Included, ignore := Ignored, output := [Output]}) ->
+    clean_opts(Opts0#parsed_params{output = ["tags"]});
+clean_opts(#parsed_params{include = Included, ignore = Ignored, output = [Output]}) ->
     log("Set includes to default current dir.~n"),
-    #{explore => to_explore_as_include_minus_ignored(Included, Ignored),
-      output => Output}.
+    #config{explore = to_explore_as_include_minus_ignored(Included, Ignored),
+      output = Output}.
 
 %% This function expands all the paths given in included and in ignored to
 %% actual filenames, and then subtracts the excluded ones from the included
