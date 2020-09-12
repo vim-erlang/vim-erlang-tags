@@ -289,7 +289,12 @@ create_tags(Explore) ->
       fun({Pid, Ref}) ->
               receive
                   {'DOWN', Ref, process, Pid, normal} -> ok
-              after 5000 -> error("Some process takes to long")
+              after
+                  30000 ->
+                      log_error(
+                        "Error: scanning the source files took too long.~n",
+                        []),
+                      halt(1)
               end
       end,
       Processes),
