@@ -67,6 +67,8 @@
 
 -mode(compile).
 
+-include_lib("kernel/include/file.hrl").
+
 -define(COMPILE, fun(Re) ->
                          {ok, CRE} = re:compile(Re, [multiline]),
                          CRE
@@ -88,6 +90,7 @@
           include = [] :: [string()],
           ignore  = [] :: [string()],
           output  = [] :: [string()],
+          follow  = false :: boolean(),
           otp     = false :: boolean(),
           verbose = false :: boolean(),
           help    = false:: boolean()
@@ -99,7 +102,7 @@
           help    :: boolean()}
        ).
 
--type cmd_param() :: include | ignore | output | otp | verbose | help.
+-type cmd_param() :: include | ignore | output | follow | otp | verbose | help.
 -type cmd_line_arg() :: string().
 -type cmd_line_arguments() :: [cmd_line_arg()].
 -type parsed_params() :: #parsed_params{}.
@@ -112,6 +115,7 @@ allowed_cmd_params() ->
      {include, ["-i", "--include", "--"]},
      {ignore,  ["-g", "--ignore"]},
      {output,  ["-o", "--output"]},
+     {follow,  ["--follow"]},
      {otp,     ["-p", "--otp"]},
      {verbose, ["-v", "--verbose"]},
      {help,    ["-h", "--help"]}
@@ -124,7 +128,8 @@ get_command_type(C) when C =:= include;
                          C =:= ignore;
                          C =:= output ->
     stateful;
-get_command_type(B) when B =:= otp;
+get_command_type(B) when B =:= follow;
+                         B =:= otp;
                          B =:= verbose;
                          B =:= help ->
     boolean.
@@ -172,6 +177,7 @@ param_get(help, #parsed_params{help = Help}) -> Help.
 param_set(include, Value, PP) -> PP#parsed_params{include = Value};
 param_set(ignore, Value, PP) -> PP#parsed_params{ignore = Value};
 param_set(output, Value, PP) -> PP#parsed_params{output = Value};
+param_set(follow, Value, PP) -> PP#parsed_params{follow = Value};
 param_set(otp, Value, PP) -> PP#parsed_params{otp = Value};
 param_set(verbose, Value, PP) -> PP#parsed_params{verbose = Value};
 param_set(help, Value, PP) -> PP#parsed_params{help = Value}.
@@ -239,9 +245,13 @@ clean_opts(#parsed_params{otp = true, include = Inc} = Opts0) ->
 clean_opts(#parsed_params{output = []} = Opts0) ->
     log("Set output to default 'tags'.~n"),
     clean_opts(Opts0#parsed_params{output = ["tags"]});
-clean_opts(#parsed_params{include = Included, ignore = Ignored, output = [Output]}) ->
+clean_opts(#parsed_params{include = Included,
+                          ignore = Ignored,
+                          output = [Output],
+                          follow = FollowSymLinks}) ->
     log("Set includes to default current dir.~n"),
-    #config{explore = to_explore_as_include_minus_ignored(Included, Ignored),
+    #config{explore = to_explore_as_include_minus_ignored(
+                        Included, Ignored, FollowSymLinks),
       output = Output}.
 
 %%------------------------------------------------------------------------------
@@ -249,27 +259,48 @@ clean_opts(#parsed_params{include = Included, ignore = Ignored, output = [Output
 %% filenames, and then subtracts the excluded ones from the included.
 %% @end
 %%------------------------------------------------------------------------------
--spec to_explore_as_include_minus_ignored([string()], [string()]) ->
+-spec to_explore_as_include_minus_ignored([string()], [string()], boolean()) ->
     [file:filename()].
-to_explore_as_include_minus_ignored(Included, Ignored) ->
-    AllIncluded = lists:append(expand_dirs(Included)),
-    AllIgnored = lists:append(expand_dirs(Ignored)),
+to_explore_as_include_minus_ignored(Included, Ignored, FollowSymLinks) ->
+    AllIncluded = lists:append(expand_dirs(Included, FollowSymLinks)),
+    AllIgnored = lists:append(expand_dirs(Ignored, FollowSymLinks)),
     lists:subtract(AllIncluded, AllIgnored).
 
--spec expand_dirs([string()]) -> [file:filename()].
-expand_dirs(DirOrFilenames) ->
-    lists:map(fun expand_dirs_or_filenames/1, DirOrFilenames).
+%%------------------------------------------------------------------------------
+%% @doc Return all Erlang source files under the directories (recursively).
+%%
+%% The regular files are simply returned.
+%% @end
+%%------------------------------------------------------------------------------
+-spec expand_dirs([string()], boolean()) -> [file:filename()].
+expand_dirs(DirOrFilenames, FollowSymLinks) ->
+    lists:map(fun(DirOrFilename) ->
+                      expand_dirs_or_filenames(DirOrFilename, FollowSymLinks)
+              end, DirOrFilenames).
 
--spec expand_dirs_or_filenames(string()) -> [file:filename()].
-expand_dirs_or_filenames(DirOrFileName) ->
+%%------------------------------------------------------------------------------
+%% @doc Return all Erlang source files under a directory (recursively).
+%%
+%% If a file is given, return that file.
+%% @end
+%%------------------------------------------------------------------------------
+-spec expand_dirs_or_filenames(string(), boolean()) -> [file:filename()].
+expand_dirs_or_filenames(DirOrFileName, FollowSymLinks) ->
     case {filelib:is_regular(DirOrFileName),
           filelib:is_dir(DirOrFileName)} of
         {true, false} ->
             % It's a file -> return the file
             [DirOrFileName];
-        {false, true} ->
-            % It's a directory -> return all source files inside the directory
+        {false, true} when FollowSymLinks ->
+            % It's a directory -> return all source files inside the directory.
+            %
+            % Using '**' has an advantage over a simple recursive function that
+            % it limits directory depths, which ensures that we eventually
+            % terminate even if these are symlink loops.
             filelib:wildcard(DirOrFileName ++ "/**/*.{erl,hrl}");
+        {false, true} when not FollowSymLinks ->
+            % It's a directory -> return all source files inside the directory
+            find_source_files(DirOrFileName);
         {false, false} ->
             case filelib:wildcard(DirOrFileName) of
                 [] ->
@@ -279,8 +310,76 @@ expand_dirs_or_filenames(DirOrFileName) ->
                     [];
                 [_|_] = Filenames ->
                     % It's a wildcard -> expand it
-                    lists:append(expand_dirs(Filenames))
+                    lists:append(expand_dirs(Filenames, FollowSymLinks))
             end
+    end.
+
+%%------------------------------------------------------------------------------
+%% @doc Return all *.erl and *.hrl files in the given directory.
+%%
+%% Symbolic links are *not* followed.
+%% @end
+%%------------------------------------------------------------------------------
+-spec find_source_files(file:name_all()) -> [file:filename()].
+find_source_files(Dir) ->
+    case file:list_dir(Dir) of
+        {ok, FileNames} ->
+            lists:append(
+              [begin
+                   FilePath =
+                       case Dir of
+                           "." ->
+                               % Don't add the './' to the beginning. This way
+                               % we behave the same way when the "--follow"
+                               % option and thus filelib:wildcard/1 is used.
+                               FileName;
+                           _ ->
+                               filename:join(Dir, FileName)
+                       end,
+                   case get_file_type(FilePath) of
+                       {ok, directory} ->
+                           log("Directory found: ~s~n", [FilePath]),
+                           find_source_files(FilePath);
+                       {ok, regular} ->
+                           case re:run(FilePath, "\\.(erl|hrl)$",
+                                       [{capture, none}]) of
+                               match ->
+                                   log("Source file found: ~s~n", [FilePath]),
+                                   case FilePath of
+                                       "./" ++ FilePathRest ->
+                                           [FilePathRest];
+                                       _ ->
+                                           [FilePath]
+                                   end;
+                               nomatch ->
+                                   []
+                           end;
+                       {ok, _} ->
+                           [];
+                       {error, Reason} ->
+                           log_error("Cannot find file or directory '~s': ~p.~n",
+                                     [FilePath, Reason]),
+                           []
+                   end
+               end || FileName <- lists:sort(FileNames)]);
+        {error, Reason} ->
+            log_error("Cannot read directory '~s': ~p.~n", [Dir, Reason]),
+            []
+    end.
+
+%%------------------------------------------------------------------------------
+%% @doc Return the type of the given file.
+%% @end
+%%------------------------------------------------------------------------------
+-spec get_file_type(file:name_all()) -> Result when
+      Type :: device | directory | other | regular | symlink,
+      Result :: {ok, Type} | {error, any()}.
+get_file_type(FileName) ->
+    case file:read_link_info(FileName) of
+        {ok, #file_info{type = FileType}} ->
+            {ok, FileType};
+        {error, Reason} ->
+            {error, Reason}
     end.
 
 %%%=============================================================================
@@ -536,6 +635,7 @@ log_error(Format, Data) ->
 print_help() ->
     Help =
 "Usage: vim-erlang-tags.erl [-h|--help] [-v|--verbose] [-] [-o|--output FILE]
+                            [--follow] [-p|--otp]
                             DIR_OR_FILE...
 
 Description:
@@ -554,6 +654,7 @@ Options:
                 Include or ignore the files/directories that match the given wildcard.
                 Read http://www.erlang.org/doc/man/filelib.html#wildcard-1 for
                 the wildcard patterns.
+  --follow      Follow symbolic links
   -p, --otp     Include the currently used OTP lib_dir
 
 Example:
