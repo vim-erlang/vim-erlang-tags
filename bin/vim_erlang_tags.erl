@@ -2,7 +2,7 @@
 %% -*- tab-width: 4;erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ts=4 sw=4 ft=erlang et
 
-%%% Copyright 2013 Csaba Hoch
+%%% Copyright 2013-2020 Csaba Hoch
 %%% Copyright 2013 Adam Rutkowski
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
@@ -82,19 +82,22 @@
 
 %%%=============================================================================
 %%% Parameter types, maps, defaults
-%%%============================================================================
--record(parsed_params,
-    {include = [] :: [string()],
-     ignore  = [] :: [string()],
-     output  = [] :: [string()],
-     otp     = false :: boolean(),
-     verbose = false :: boolean(),
-     help    = false:: boolean()}).
+%%%=============================================================================
 
--record(config,
-    {explore :: [file:filename()],
-     output  :: file:filename(),
-     help    :: boolean()}).
+-record(parsed_params, {
+          include = [] :: [string()],
+          ignore  = [] :: [string()],
+          output  = [] :: [string()],
+          otp     = false :: boolean(),
+          verbose = false :: boolean(),
+          help    = false:: boolean()
+         }).
+
+-record(config, {
+          explore :: [file:filename()],
+          output  :: file:filename(),
+          help    :: boolean()}
+       ).
 
 -type cmd_param() :: include | ignore | output | otp | verbose | help.
 -type cmd_line_arg() :: string().
@@ -270,9 +273,10 @@ expand_dirs_or_filenames(FileName) ->
 
 %%%=============================================================================
 %%% Create tags from directory trees and file lists
-%%%================================================================================================
+%%%=============================================================================
 
-% Read the given Erlang source files and return an ets table that contains the appropriate tags.
+% Read the given Erlang source files and return an ets table that contains the
+% appropriate tags.
 -spec create_tags([file:filename()]) -> ets:tid().
 create_tags(Explore) ->
     log("In create_tags, To explore: ~p~n", [Explore]),
@@ -302,7 +306,8 @@ create_tags(Explore) ->
 
 
 % Go through the given files: scan the Erlang files for tags
-% Here we now for sure that `Files` are indeed files with extensions *.erl or *.hrl.
+% Here we now for sure that `Files` are indeed files with extensions *.erl or
+% *.hrl.
 -spec process_filenames(Files, EtsTags, Processes) -> RetProcesses when
       Files :: [file:filename()],
       EtsTags :: ets:tid(),
@@ -319,7 +324,8 @@ process_filenames([File|OtherFiles], EtsTags, Processes) ->
 %%% Scan a file or line for tags
 %%%=============================================================================
 
-% Read the given Erlang source file and add the appropriate tags to the EtsTags ets table.
+% Read the given Erlang source file and add the appropriate tags to the EtsTags
+% ets table.
 add_tags_from_file(File, EtsTags, Verbose) ->
     put(verbose, Verbose),
     log("~nProcessing file: ~s~n", [File]),
