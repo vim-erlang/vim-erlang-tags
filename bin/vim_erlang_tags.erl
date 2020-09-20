@@ -189,8 +189,11 @@ parse_next_arg([Arg | NextArgs] = AllArgs) ->
       {include, AllArgs},
       allowed_cmd_params()).
 
-%% Return args for the current parameter,
-%% and the rest of the args to continue parsing
+%%------------------------------------------------------------------------------
+%% @doc Return args for the current parameter, and the rest of the args to
+%% continue parsing
+%% @end
+%%------------------------------------------------------------------------------
 -spec get_full_arg_state(Param, CurrentParamState, ToContinueParsing) -> Ret
     when Param :: cmd_param(),
          CurrentParamState :: cmd_line_arguments(),
@@ -241,8 +244,11 @@ clean_opts(#parsed_params{include = Included, ignore = Ignored, output = [Output
     #config{explore = to_explore_as_include_minus_ignored(Included, Ignored),
       output = Output}.
 
-%% This function expands all the paths given in included and in ignored to
-%% actual filenames, and then subtracts the excluded ones from the included
+%%------------------------------------------------------------------------------
+%% @doc Expand all the paths given in included and in ignored to actual
+%% filenames, and then subtracts the excluded ones from the included.
+%% @end
+%%------------------------------------------------------------------------------
 -spec to_explore_as_include_minus_ignored([string()], [string()]) ->
     [file:filename()].
 to_explore_as_include_minus_ignored(Included, Ignored) ->
@@ -275,8 +281,11 @@ expand_dirs_or_filenames(FileName) ->
 %%% Create tags from directory trees and file lists
 %%%=============================================================================
 
-% Read the given Erlang source files and return an ets table that contains the
-% appropriate tags.
+%%------------------------------------------------------------------------------
+%% @doc Read the given Erlang source files and return an ets table that contains
+%% the appropriate tags.
+%% @end
+%%------------------------------------------------------------------------------
 -spec create_tags([file:filename()]) -> ets:tid().
 create_tags(Explore) ->
     log("In create_tags, To explore: ~p~n", [Explore]),
@@ -305,9 +314,13 @@ create_tags(Explore) ->
     EtsTags.
 
 
-% Go through the given files: scan the Erlang files for tags
-% Here we now for sure that `Files` are indeed files with extensions *.erl or
-% *.hrl.
+%%------------------------------------------------------------------------------
+%% @doc Go through the given files: scan the Erlang files for tags.
+%%
+%% Here we now for sure that `Files` are indeed files with extensions *.erl or
+%% *.hrl.
+%% @end
+%%------------------------------------------------------------------------------
 -spec process_filenames(Files, EtsTags, Processes) -> RetProcesses when
       Files :: [file:filename()],
       EtsTags :: ets:tid(),
@@ -324,8 +337,11 @@ process_filenames([File|OtherFiles], EtsTags, Processes) ->
 %%% Scan a file or line for tags
 %%%=============================================================================
 
-% Read the given Erlang source file and add the appropriate tags to the EtsTags
-% ets table.
+%%------------------------------------------------------------------------------
+%% @doc Read the given Erlang source file and add the appropriate tags to the
+%%      EtsTags ets table.
+%% @end
+%%------------------------------------------------------------------------------
 add_tags_from_file(File, EtsTags, Verbose) ->
     put(verbose, Verbose),
     log("~nProcessing file: ~s~n", [File]),
