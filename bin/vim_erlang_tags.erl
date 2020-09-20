@@ -257,23 +257,29 @@ to_explore_as_include_minus_ignored(Included, Ignored) ->
     lists:subtract(AllIncluded, AllIgnored).
 
 -spec expand_dirs([string()]) -> [file:filename()].
-expand_dirs(Included) ->
-    lists:map(fun expand_dirs_or_filenames/1, Included).
+expand_dirs(DirOrFilenames) ->
+    lists:map(fun expand_dirs_or_filenames/1, DirOrFilenames).
 
 -spec expand_dirs_or_filenames(string()) -> [file:filename()].
-expand_dirs_or_filenames(FileName) ->
-    case {filelib:is_regular(FileName), filelib:is_dir(FileName)} of
+expand_dirs_or_filenames(DirOrFileName) ->
+    case {filelib:is_regular(DirOrFileName),
+          filelib:is_dir(DirOrFileName)} of
         {true, false} ->
-            [FileName];
+            % It's a file -> return the file
+            [DirOrFileName];
         {false, true} ->
-            filelib:wildcard(FileName ++ "/**/*.{erl,hrl}");
+            % It's a directory -> return all source files inside the directory
+            filelib:wildcard(DirOrFileName ++ "/**/*.{erl,hrl}");
         {false, false} ->
-            case filelib:wildcard(FileName) of
+            case filelib:wildcard(DirOrFileName) of
                 [] ->
-                    log_error("File \"~p\" is not a proper file.~n", [FileName]),
+                    % It's neither a file, nor a directory, not a wildcard ->
+                    % error
+                    log_error("File \"~p\" is not a proper file.~n", [DirOrFileName]),
                     [];
-                [_|_] = FS ->
-                    lists:append(expand_dirs(FS))
+                [_|_] = Filenames ->
+                    % It's a wildcard -> expand it
+                    lists:append(expand_dirs(Filenames))
             end
     end.
 
