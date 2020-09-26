@@ -69,21 +69,34 @@
 
 -include_lib("kernel/include/file.hrl").
 
+%%%=============================================================================
+%%% Macros
+%%%=============================================================================
+
 -define(COMPILE, fun(Re) ->
                          {ok, CRE} = re:compile(Re, [multiline]),
                          CRE
                  end).
 
--define(RE_FUNCTIONS,  ?COMPILE("^([a-z][a-zA-Z0-9_@]*)\\s*\\(")).
--define(RE_TYPESPECS1, ?COMPILE("^-\\s*(type|opaque)\\s*([a-zA-Z0-9_@]+)\\b")).
--define(RE_TYPESPECS2, ?COMPILE("^-\\s*(type|opaque)\\s*'([^ \\t']+)'")).
--define(RE_DEFINES1,   ?COMPILE("^-\\s*(record|define)\\s*\\(?\\s*([a-zA-Z0-9_@]+)\\b")).
--define(RE_DEFINES2,   ?COMPILE("^-\\s*(record|define)\\s*\\(?\\s*'([^ \\t']+)'")).
+-define(RE_FUNCTIONS,
+        ?COMPILE("^([a-z][a-zA-Z0-9_@]*)\\s*\\(")).
+
+-define(RE_TYPESPECS1,
+        ?COMPILE("^-\\s*(type|opaque)\\s*([a-zA-Z0-9_@]+)\\b")).
+
+-define(RE_TYPESPECS2,
+        ?COMPILE("^-\\s*(type|opaque)\\s*'([^ \\t']+)'")).
+
+-define(RE_DEFINES1,
+        ?COMPILE("^-\\s*(record|define)\\s*\\(?\\s*([a-zA-Z0-9_@]+)\\b")).
+
+-define(RE_DEFINES2,
+        ?COMPILE("^-\\s*(record|define)\\s*\\(?\\s*'([^ \\t']+)'")).
 
 -define(DEFAULT_PATH, ".").
 
 %%%=============================================================================
-%%% Parameter types, maps, defaults
+%%% Types
 %%%=============================================================================
 
 -record(parsed_params, {
@@ -93,23 +106,147 @@
           follow  = false :: boolean(),
           otp     = false :: boolean(),
           verbose = false :: boolean(),
-          help    = false:: boolean()
+          help    = false :: boolean()
          }).
+
+-type parsed_params() :: #parsed_params{}.
+%% The parameters of the script after they are parsed.
 
 -record(config, {
           explore :: [file:filename()],
           output  :: file:filename(),
-          help    :: boolean()}
-       ).
-
--type cmd_param() :: include | ignore | output | follow | otp | verbose | help.
--type cmd_line_arg() :: string().
--type cmd_line_arguments() :: [cmd_line_arg()].
--type parsed_params() :: #parsed_params{}.
+          help    :: boolean()
+         }).
 
 -type config() :: #config{}.
+%% Configuration that describes what the script needs to do.
+%%
+%% {@link clean_opts/1}
 
--spec allowed_cmd_params() -> [{cmd_param(), cmd_line_arguments()}].
+-type cmd_line_arg() :: string().
+%% A command line argument (before parsing).
+
+-type cmd_line_arguments() :: [cmd_line_arg()].
+%% A list of command line argument (before parsing).
+
+-type cmd_param() :: include | ignore | output | follow | otp | verbose | help.
+%% A command line parameter (after parsing).
+
+-type command_type() :: boolean | stateful.
+%% The type of a command line parameter.
+
+-type param_value() :: boolean() |             % if command_type() is boolean
+                       [cmd_line_arguments()]. % if command_type() is stateful
+%% The value of a command line parameter.
+
+-type tag_address() :: iolist().
+%% The Ex command that positions the cursor on the tag.
+%%
+%% See `:help tags-file-format' and search for `{tagaddress}'.
+%%
+%% Example: `/^myfunction\>/'.
+
+-type scope() :: global | local.
+%% Shows the scope of a tag. If a tag is local, then the editor should jump to
+%% it only from the same file. If a tag is global, then the editor should jump
+%% to it from any other file.
+%%
+%% See `:help tags-file-format' and search for `"file:"'.
+
+%%%=============================================================================
+%%% Main function
+%%%=============================================================================
+
+%%------------------------------------------------------------------------------
+%% @doc This function is the entry point of the script.
+%% @end
+%%------------------------------------------------------------------------------
+main(Args) ->
+    log("Entering main. Args are ~p~n~n", [Args]),
+    ParsedArgs = parse_args(#parsed_params{}, Args),
+    set_verbose_flag(ParsedArgs),
+    Opts = clean_opts(ParsedArgs),
+    run(Opts).
+
+%%------------------------------------------------------------------------------
+%% @doc Read the files and generate the tags.
+%% @end
+%%------------------------------------------------------------------------------
+run(#config{help = true}) ->
+    print_help();
+run(#config{explore = Explore, output = TagFile}) ->
+    EtsTags = create_tags(Explore),
+    ok = tags_to_file(EtsTags, TagFile),
+    ets:delete(EtsTags).
+
+%%%=============================================================================
+%%% Parse command line arguments
+%%%=============================================================================
+
+%%------------------------------------------------------------------------------
+%% @doc Parse the the command line arguments.
+%% @end
+%%------------------------------------------------------------------------------
+-spec parse_args(Acc, CmdLineArgs) -> Result when
+      Acc :: parsed_params(),
+      CmdLineArgs :: cmd_line_arguments(),
+      Result :: parsed_params().
+parse_args(Opts, []) ->
+    Opts;
+parse_args(Opts, AllCliArgs) ->
+    {Param, RestCliArgs1} = parse_next_arg(AllCliArgs),
+    {ParamValue, RestCliArgs2} =
+        case get_command_type(Param) of
+            boolean ->
+                {true, RestCliArgs1};
+            stateful ->
+                get_full_arg_state(
+                  Param, param_get(Param, Opts), RestCliArgs1)
+        end,
+    parse_args(param_set(Param, ParamValue, Opts), RestCliArgs2).
+
+%%------------------------------------------------------------------------------
+%% @doc Parse the next command line argument.
+%% @end
+%%------------------------------------------------------------------------------
+-spec parse_next_arg(AllCliArgs) -> Result when
+      AllCliArgs :: nonempty_list(cmd_line_arg()),
+      Result :: {cmd_param(),
+                 Rest :: cmd_line_arguments()}.
+parse_next_arg([Arg | RestArgs] = AllCliArgs) ->
+    lists:foldl(
+      fun({Param, ParamList}, Acc) ->
+              case lists:member(Arg, ParamList) of
+                  true -> {Param, RestArgs};
+                  _ -> Acc
+              end
+      end, %% If the parameter is not recognised, just throw it into include
+      {include, AllCliArgs},
+      allowed_cmd_params()).
+
+%%------------------------------------------------------------------------------
+%% @doc Return the type of a command.
+%% @end
+%%------------------------------------------------------------------------------
+-spec get_command_type(Cmd) -> Result when
+      Cmd :: cmd_param(),
+      Result :: command_type().
+get_command_type(C) when C =:= include;
+                         C =:= ignore;
+                         C =:= output ->
+    stateful;
+get_command_type(B) when B =:= follow;
+                         B =:= otp;
+                         B =:= verbose;
+                         B =:= help ->
+    boolean.
+
+%%------------------------------------------------------------------------------
+%% @doc Return the list of allowed command line parameters.
+%% @end
+%%------------------------------------------------------------------------------
+-spec allowed_cmd_params() -> Result when
+      Result :: [{cmd_param(), cmd_line_arguments()}].
 allowed_cmd_params() ->
     [
      {include, ["-i", "--include", "--"]},
@@ -121,99 +258,29 @@ allowed_cmd_params() ->
      {help,    ["-h", "--help"]}
     ].
 
--type command_type() :: stateful | boolean.
-
--spec get_command_type(Cmd :: cmd_param()) -> command_type().
-get_command_type(C) when C =:= include;
-                         C =:= ignore;
-                         C =:= output ->
-    stateful;
-get_command_type(B) when B =:= follow;
-                         B =:= otp;
-                         B =:= verbose;
-                         B =:= help ->
-    boolean.
-
-main(Args) ->
-    log("Entering main. Args are ~p~n~n", [Args]),
-    ParsedArgs = parse_args(#parsed_params{}, Args),
-    set_verbose_flag(ParsedArgs),
-    Opts = clean_opts(ParsedArgs),
-    run(Opts).
-
-run(#config{help = true}) ->
-    print_help();
-run(#config{explore = Explore, output = TagFile}) ->
-    EtsTags = create_tags(Explore),
-    ok = tags_to_file(EtsTags, TagFile),
-    ets:delete(EtsTags).
-
-set_verbose_flag(#parsed_params{verbose = Verbose}) ->
-    put(verbose, Verbose),
-    log("Verbose mode on.~n").
-
--spec parse_args(parsed_params(), cmd_line_arguments()) -> parsed_params().
-parse_args(Opts, []) ->
-    Opts;
-parse_args(Opts, AllArgs) ->
-    {Param, ToContinueParsing} = parse_next_arg(AllArgs),
-    {ParamState, NextArgs} =
-        case get_command_type(Param) of
-            boolean ->
-                {true, ToContinueParsing};
-            stateful ->
-                get_full_arg_state(
-                  Param, param_get(Param, Opts), ToContinueParsing)
-        end,
-    parse_args(param_set(Param, ParamState, Opts), NextArgs).
-
-param_get(include, #parsed_params{include = Include}) -> Include;
-param_get(ignore, #parsed_params{ignore = Ignore}) -> Ignore;
-param_get(output, #parsed_params{output = Output}) -> Output;
-param_get(otp, #parsed_params{otp = Otp}) -> Otp;
-param_get(verbose, #parsed_params{verbose = Verbose}) -> Verbose;
-param_get(help, #parsed_params{help = Help}) -> Help.
-
-param_set(include, Value, PP) -> PP#parsed_params{include = Value};
-param_set(ignore, Value, PP) -> PP#parsed_params{ignore = Value};
-param_set(output, Value, PP) -> PP#parsed_params{output = Value};
-param_set(follow, Value, PP) -> PP#parsed_params{follow = Value};
-param_set(otp, Value, PP) -> PP#parsed_params{otp = Value};
-param_set(verbose, Value, PP) -> PP#parsed_params{verbose = Value};
-param_set(help, Value, PP) -> PP#parsed_params{help = Value}.
-
--spec parse_next_arg(nonempty_list(cmd_line_arg())) ->
-    {cmd_param(), cmd_line_arguments()}.
-parse_next_arg([Arg | NextArgs] = AllArgs) ->
-    lists:foldl(
-      fun({Param, ParamList}, Acc) ->
-              case lists:member(Arg, ParamList) of
-                  true -> {Param, NextArgs};
-                  _ -> Acc
-              end
-      end, %% If the parameter is not recognised, just throw it into include
-      {include, AllArgs},
-      allowed_cmd_params()).
-
 %%------------------------------------------------------------------------------
-%% @doc Return args for the current parameter, and the rest of the args to
-%% continue parsing
+%% @doc Return arguments of the current parameter.
 %% @end
 %%------------------------------------------------------------------------------
--spec get_full_arg_state(Param, CurrentParamState, ToContinueParsing) -> Ret
-    when Param :: cmd_param(),
-         CurrentParamState :: cmd_line_arguments(),
-         ToContinueParsing :: cmd_line_arguments(),
-         Ret :: {cmd_line_arguments(), cmd_line_arguments()}.
-get_full_arg_state(Param, CurrentParamState, ToContinueParsing) ->
+-spec get_full_arg_state(Param, CurrentParamValue, RestCliArgs) -> Result when
+      Param :: cmd_param(),
+      CurrentParamValue :: cmd_line_arguments(),
+      RestCliArgs :: cmd_line_arguments(),
+      Result :: {NewParamState :: cmd_line_arguments(),
+                 RestCliArgs :: cmd_line_arguments()}.
+get_full_arg_state(Param, CurrentParamValue, RestCliArgs) ->
     log("Parsing args for parameter ~p~n", [Param]),
-    {StateArgs, Rest} = consume_until_new_command(ToContinueParsing),
-    case StateArgs of
+    {NewArgs, Rest} = consume_until_new_command(RestCliArgs),
+    case NewArgs of
         [] -> log_error("Arguments needed for ~s.~n", [Param]);
         _ -> ok
     end,
-    {StateArgs ++ CurrentParamState, Rest}.
+    {NewArgs ++ CurrentParamValue, Rest}.
 
+%%------------------------------------------------------------------------------
+%% @doc Consume the arguments until there is a new parameter.
+%% @end
+%%------------------------------------------------------------------------------
 -spec consume_until_new_command(Args) -> {ConsumedArgs, RestArgs} when
       Args :: cmd_line_arguments(),
       ConsumedArgs :: cmd_line_arguments(),
@@ -232,7 +299,58 @@ consume_until_new_command(Args) ->
               true
       end, Args).
 
--spec clean_opts(parsed_params()) -> config().
+%%------------------------------------------------------------------------------
+%% @doc Get a parameter from the "parsed parameters" record.
+%% @end
+%%------------------------------------------------------------------------------
+-spec param_get(Parameter, ParsedParams) -> Result when
+      Parameter :: cmd_param(),
+      ParsedParams :: parsed_params(),
+      Result :: param_value().
+param_get(include, #parsed_params{include = Include}) -> Include;
+param_get(ignore, #parsed_params{ignore = Ignore}) -> Ignore;
+param_get(output, #parsed_params{output = Output}) -> Output;
+param_get(otp, #parsed_params{otp = Otp}) -> Otp;
+param_get(verbose, #parsed_params{verbose = Verbose}) -> Verbose;
+param_get(help, #parsed_params{help = Help}) -> Help.
+
+%%------------------------------------------------------------------------------
+%% @doc Set a parameter in the "parsed parameters" record.
+%% @end
+%%------------------------------------------------------------------------------
+-spec param_set(Parameter, Value, ParsedParams) -> ParsedParams when
+      Parameter :: cmd_param(),
+      Value :: param_value(),
+      ParsedParams :: parsed_params().
+param_set(include, Value, PP) -> PP#parsed_params{include = Value};
+param_set(ignore, Value, PP) -> PP#parsed_params{ignore = Value};
+param_set(output, Value, PP) -> PP#parsed_params{output = Value};
+param_set(follow, Value, PP) -> PP#parsed_params{follow = Value};
+param_set(otp, Value, PP) -> PP#parsed_params{otp = Value};
+param_set(verbose, Value, PP) -> PP#parsed_params{verbose = Value};
+param_set(help, Value, PP) -> PP#parsed_params{help = Value}.
+
+%%%=============================================================================
+%%% Apply command line parameters
+%%%=============================================================================
+
+%%------------------------------------------------------------------------------
+%% @doc Set "verbose" mode according to the CLI parameters.
+%% @end
+%%------------------------------------------------------------------------------
+-spec set_verbose_flag(ParsedParams) -> ok when
+      ParsedParams :: parsed_params().
+set_verbose_flag(#parsed_params{verbose = Verbose}) ->
+    put(verbose, Verbose),
+    log("Verbose mode on.~n").
+
+%%------------------------------------------------------------------------------
+%% @doc Convert the "parsed parameters" record into the "config" record.
+%% @end
+%%------------------------------------------------------------------------------
+-spec clean_opts(ParsedParams) -> Result when
+      ParsedParams :: parsed_params(),
+      Result :: config().
 clean_opts(#parsed_params{help = true}) ->
     #config{help = true};
 clean_opts(#parsed_params{include = []} = Opts0) ->
@@ -259,8 +377,12 @@ clean_opts(#parsed_params{include = Included,
 %% filenames, and then subtracts the excluded ones from the included.
 %% @end
 %%------------------------------------------------------------------------------
--spec to_explore_as_include_minus_ignored([string()], [string()], boolean()) ->
-    [file:filename()].
+-spec to_explore_as_include_minus_ignored(Included, Ignored,
+                                          FollowSymLinks) -> Result when
+      Included :: [string()],
+      Ignored :: [string()],
+      FollowSymLinks :: boolean(),
+      Result :: [file:filename()].
 to_explore_as_include_minus_ignored(Included, Ignored, FollowSymLinks) ->
     AllIncluded = lists:append(expand_dirs(Included, FollowSymLinks)),
     AllIgnored = lists:append(expand_dirs(Ignored, FollowSymLinks)),
@@ -272,7 +394,10 @@ to_explore_as_include_minus_ignored(Included, Ignored, FollowSymLinks) ->
 %% The regular files are simply returned.
 %% @end
 %%------------------------------------------------------------------------------
--spec expand_dirs([string()], boolean()) -> [file:filename()].
+-spec expand_dirs(DirOrFileNames, FollowSymLinks) -> Result when
+      DirOrFileNames :: [string()],
+      FollowSymLinks :: boolean(),
+      Result :: [file:filename()].
 expand_dirs(DirOrFilenames, FollowSymLinks) ->
     lists:map(fun(DirOrFilename) ->
                       expand_dirs_or_filenames(DirOrFilename, FollowSymLinks)
@@ -284,7 +409,10 @@ expand_dirs(DirOrFilenames, FollowSymLinks) ->
 %% If a file is given, return that file.
 %% @end
 %%------------------------------------------------------------------------------
--spec expand_dirs_or_filenames(string(), boolean()) -> [file:filename()].
+-spec expand_dirs_or_filenames(DirOrFileName, FollowSymLinks) -> Result when
+      DirOrFileName :: string(),
+      FollowSymLinks :: boolean(),
+      Result :: [file:filename()].
 expand_dirs_or_filenames(DirOrFileName, FollowSymLinks) ->
     case {filelib:is_regular(DirOrFileName),
           filelib:is_dir(DirOrFileName)} of
@@ -320,7 +448,9 @@ expand_dirs_or_filenames(DirOrFileName, FollowSymLinks) ->
 %% Symbolic links are *not* followed.
 %% @end
 %%------------------------------------------------------------------------------
--spec find_source_files(file:name_all()) -> [file:filename()].
+-spec find_source_files(Dir) -> Result when
+      Dir :: file:name_all(),
+      Result :: [file:filename()].
 find_source_files(Dir) ->
     case file:list_dir(Dir) of
         {ok, FileNames} ->
@@ -371,7 +501,8 @@ find_source_files(Dir) ->
 %% @doc Return the type of the given file.
 %% @end
 %%------------------------------------------------------------------------------
--spec get_file_type(file:name_all()) -> Result when
+-spec get_file_type(FileName) -> Result when
+      FileName :: file:name_all(),
       Type :: device | directory | other | regular | symlink,
       Result :: {ok, Type} | {error, any()}.
 get_file_type(FileName) ->
@@ -391,7 +522,9 @@ get_file_type(FileName) ->
 %% the appropriate tags.
 %% @end
 %%------------------------------------------------------------------------------
--spec create_tags([file:filename()]) -> ets:tid().
+-spec create_tags(Explore) -> Result when
+      Explore :: [file:filename()],
+      Result :: ets:tid().
 create_tags(Explore) ->
     log("In create_tags, To explore: ~p~n", [Explore]),
     EtsTags = ets:new(tags,
@@ -447,6 +580,10 @@ process_filenames([File|OtherFiles], EtsTags, Processes) ->
 %%      EtsTags ets table.
 %% @end
 %%------------------------------------------------------------------------------
+-spec add_tags_from_file(File, EtsTags, Verbose) -> ok when
+      File :: file:filename(),
+      EtsTags :: ets:tid(),
+      Verbose :: boolean().
 add_tags_from_file(File, EtsTags, Verbose) ->
     put(verbose, Verbose),
     log("~nProcessing file: ~s~n", [File]),
@@ -456,10 +593,21 @@ add_tags_from_file(File, EtsTags, Verbose) ->
     add_file_tag(EtsTags, File, BaseName, ModName),
 
     case file:read_file(File) of
-        {ok, Contents} -> ok = scan_tags(Contents, {EtsTags, File, ModName});
-        Err -> log_error("File ~s not readable: ~p~n", [File, Err])
+        {ok, Contents} ->
+            ok = scan_tags(Contents, {EtsTags, File, ModName});
+        Err ->
+            log_error("File ~s not readable: ~p~n", [File, Err])
     end.
 
+%%------------------------------------------------------------------------------
+%% @doc Add all tags found in the file to the ETS table.
+%% @end
+%%------------------------------------------------------------------------------
+-spec scan_tags(Contents, {EtsTags, File, ModName}) -> ok when
+      Contents :: binary(),
+      EtsTags :: ets:tid(),
+      File :: file:filename(),
+      ModName :: string().
 scan_tags(Contents, {EtsTags, File, ModName}) ->
     scan_tags_core(
       Contents, ?RE_FUNCTIONS,
@@ -492,6 +640,14 @@ scan_tags(Contents, {EtsTags, File, ModName}) ->
       end),
     ok.
 
+%%------------------------------------------------------------------------------
+%% @doc Apply a function to the tags that that match a pattern.
+%% @end
+%%------------------------------------------------------------------------------
+-spec scan_tags_core(Contents, Pattern, Fun) -> ok when
+      Contents :: binary(),
+      Pattern :: re:mp(),
+      Fun :: fun().
 scan_tags_core(Contents, Pattern, Fun) ->
     case re:run(Contents, Pattern, [{capture, all, binary}, global]) of
         nomatch ->
@@ -504,22 +660,42 @@ scan_tags_core(Contents, Pattern, Fun) ->
 %%% Add specific tags
 %%%=============================================================================
 
-% Add this information to EtsTags.
+%%------------------------------------------------------------------------------
+%% @doc Add a tag about the file.
+%%
+%% If the file is a module, add a module tag.
+%% @end
+%%------------------------------------------------------------------------------
+-spec add_file_tag(EtsTags, File, BaseName, ModName) -> ok when
+      EtsTags :: ets:tid(),
+      File :: file:filename(),
+      BaseName :: string(),
+      ModName :: string().
 add_file_tag(EtsTags, File, BaseName, ModName) ->
 
+    % File entry:
     % myfile.hrl <tab> ./myfile.hrl <tab> 1;"  F
     % myfile.erl <tab> ./myfile.erl <tab> 1;"  F
-    % myfile <tab> ./myfile.erl <tab> 1;"  M
     add_tag(EtsTags, BaseName, File, "1", global, $F),
 
     case filename:extension(File) of
         ".erl" ->
+            % Module entry:
+            % myfile <tab> ./myfile.erl <tab> 1;"  M
             add_tag(EtsTags, ModName, File, "1", global, $M);
         _ ->
             ok
     end.
 
-% File contains the function ModName:FuncName; add this information to EtsTags.
+%%------------------------------------------------------------------------------
+%% @doc Add a tag about a function definition.
+%% @end
+%%------------------------------------------------------------------------------
+-spec add_func_tags(EtsTags, File, ModName, FuncName) -> ok when
+      EtsTags :: ets:tid(),
+      File :: file:filename(),
+      ModName :: string(),
+      FuncName :: binary().
 add_func_tags(EtsTags, File, ModName, FuncName) ->
 
     log("Function definition found: ~s~n", [FuncName]),
@@ -533,7 +709,18 @@ add_func_tags(EtsTags, File, ModName, FuncName) ->
     % f <tab> ./mymod.erl <tab> /^f\>/ <space><space> ;" <tab> file:
     add_tag(EtsTags, FuncName, File, ["/^", FuncName, "\\>/"], local, $f).
 
-% File contains the type ModName:Type; add this information to EtsTags.
+%%------------------------------------------------------------------------------
+%% @doc Add a tag about a type definition.
+%% @end
+%%------------------------------------------------------------------------------
+-spec add_type_tags(EtsTags, File, ModName, Attribute, TypeName,
+                    InnerPattern) -> ok when
+      EtsTags :: ets:tid(),
+      File :: file:filename(),
+      ModName :: string(),
+      Attribute :: binary(), % "type" | "opaque"
+      TypeName :: binary(),
+      InnerPattern :: iolist().
 add_type_tags(EtsTags, File, ModName, Attribute, TypeName, InnerPattern) ->
 
     log("Type definition found: ~s~n", [TypeName]),
@@ -552,7 +739,17 @@ add_type_tags(EtsTags, File, ModName, Attribute, TypeName, InnerPattern) ->
     %     <space><space> ;" <tab> file:
     add_tag(EtsTags, TypeName, File, Pattern, local, $t).
 
-% File contains a macro or record called Name; add this information to EtsTags.
+%%------------------------------------------------------------------------------
+%% @doc Add a tag about a record or macro.
+%% @end
+%%------------------------------------------------------------------------------
+-spec add_record_or_macro_tag(EtsTags, File, Attribute, Name,
+                              InnerPattern) -> ok when
+      EtsTags :: ets:tid(),
+      File :: file:filename(),
+      Attribute :: binary(), % "record" | "macro"
+      Name :: binary(), % the name of the record or macro
+      InnerPattern :: iolist().
 add_record_or_macro_tag(EtsTags, File, Attribute, Name, InnerPattern) ->
 
     {Kind, Prefix} =
@@ -589,13 +786,34 @@ add_record_or_macro_tag(EtsTags, File, Attribute, Name, InnerPattern) ->
             ["/^-\\s\\*", Attribute, "\\s\\*(\\?\\s\\*", InnerPattern, "/"],
             Scope, Kind).
 
+%%------------------------------------------------------------------------------
+%% @doc Add a tags to the ETS table.
+%% @end
+%%------------------------------------------------------------------------------
+-spec add_tag(EtsTags, Tag, File, TagAddress, Scope, Kind) -> ok when
+      EtsTags :: ets:tid(),
+      Tag :: iodata(),
+      File :: file:filename(),
+      TagAddress :: tag_address(),
+      Scope :: scope(),
+      Kind :: char().
 add_tag(EtsTags, Tag, File, TagAddress, Scope, Kind) ->
-    ets:insert_new(EtsTags, {{Tag, File, Scope, Kind}, TagAddress}).
+    true = ets:insert_new(EtsTags, {{Tag, File, Scope, Kind}, TagAddress}),
+    ok.
 
 %%%=============================================================================
 %%% Writing tags into a file
 %%%=============================================================================
 
+%%------------------------------------------------------------------------------
+%% @doc Write the tags into a tag file.
+%%
+%% See `:help tags-file-format' for the tag file format.
+%% @end
+%%------------------------------------------------------------------------------
+-spec tags_to_file(EtsTags, TagsFile) -> ok when
+      EtsTags :: ets:tid(),
+      TagsFile :: file:name_all().
 tags_to_file(EtsTags, TagsFile) ->
     Header = "!_TAG_FILE_SORTED\t1\t/0=unsorted, 1=sorted/\n",
     Entries = lists:sort(
@@ -603,12 +821,23 @@ tags_to_file(EtsTags, TagsFile) ->
     file:write_file(TagsFile, [Header, Entries]),
     ok.
 
+%%------------------------------------------------------------------------------
+%% @doc Convert one tag into a line in a tag file.
+%% @end
+%%------------------------------------------------------------------------------
+-spec tag_to_binary({{Tag, File, Scope, Kind}, TagAddress}) -> Result when
+      Tag :: iodata(),
+      File :: file:filename(),
+      Scope :: scope(),
+      Kind :: char(),
+      TagAddress :: tag_address(),
+      Result :: binary().
 tag_to_binary({{Tag, File, Scope, Kind}, TagAddress}) ->
     ScopeStr =
-    case Scope of
-        global -> "";
-        local -> "\tfile:"
-    end,
+        case Scope of
+            global -> "";
+            local -> "\tfile:"
+        end,
     iolist_to_binary([Tag, "\t",
                       File, "\t",
                       TagAddress, ";\"\t",
@@ -619,8 +848,22 @@ tag_to_binary({{Tag, File, Scope, Kind}, TagAddress}) ->
 %%% Utility functions
 %%%=============================================================================
 
+%%------------------------------------------------------------------------------
+%% @doc Print a log entry.
+%% @end
+%%------------------------------------------------------------------------------
+-spec log(Format) -> ok when
+      Format :: io:format().
 log(Format) ->
     log(Format, []).
+
+%%------------------------------------------------------------------------------
+%% @doc Print a log entry.
+%% @end
+%%------------------------------------------------------------------------------
+-spec log(Format, Data) -> ok when
+      Format :: io:format(),
+      Data :: [any()].
 log(Format, Data) ->
     case get(verbose) of
         true ->
@@ -629,9 +872,21 @@ log(Format, Data) ->
             ok
     end.
 
+%%------------------------------------------------------------------------------
+%% @doc Print an error.
+%% @end
+%%------------------------------------------------------------------------------
+-spec log_error(Format, Data) -> ok when
+      Format :: io:format(),
+      Data :: [any()].
 log_error(Format, Data) ->
     io:format(standard_error, Format, Data).
 
+%%------------------------------------------------------------------------------
+%% @doc Print the script's help.
+%% @end
+%%------------------------------------------------------------------------------
+-spec print_help() -> ok.
 print_help() ->
     Help =
 "Usage: vim-erlang-tags.erl [-h|--help] [-v|--verbose] [-] [-o|--output FILE]
