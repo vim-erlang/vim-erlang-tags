@@ -136,7 +136,7 @@ get_command_type(B) when B =:= follow;
 
 main(Args) ->
     log("Entering main. Args are ~p~n~n", [Args]),
-    ParsedArgs = reparse_args(#parsed_params{}, Args),
+    ParsedArgs = parse_args(#parsed_params{}, Args),
     set_verbose_flag(ParsedArgs),
     Opts = clean_opts(ParsedArgs),
     run(Opts).
@@ -152,10 +152,10 @@ set_verbose_flag(#parsed_params{verbose = Verbose}) ->
     put(verbose, Verbose),
     log("Verbose mode on.~n").
 
--spec reparse_args(parsed_params(), cmd_line_arguments()) -> parsed_params().
-reparse_args(Opts, []) ->
+-spec parse_args(parsed_params(), cmd_line_arguments()) -> parsed_params().
+parse_args(Opts, []) ->
     Opts;
-reparse_args(Opts, AllArgs) ->
+parse_args(Opts, AllArgs) ->
     {Param, ToContinueParsing} = parse_next_arg(AllArgs),
     {ParamState, NextArgs} =
         case get_command_type(Param) of
@@ -165,7 +165,7 @@ reparse_args(Opts, AllArgs) ->
                 get_full_arg_state(
                   Param, param_get(Param, Opts), ToContinueParsing)
         end,
-    reparse_args(param_set(Param, ParamState, Opts), NextArgs).
+    parse_args(param_set(Param, ParamState, Opts), NextArgs).
 
 param_get(include, #parsed_params{include = Include}) -> Include;
 param_get(ignore, #parsed_params{ignore = Ignore}) -> Ignore;
