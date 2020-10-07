@@ -889,7 +889,9 @@ log_error(Format, Data) ->
 -spec print_help() -> ok.
 print_help() ->
     Help =
-"Usage: vim-erlang-tags.erl [-h|--help] [-v|--verbose] [-] [-o|--output FILE]
+"Usage: vim-erlang-tags.erl [-h|--help] [-v|--verbose] [-o|--output FILE]
+                            [-i|--include FILE_WILDCARD]
+                            [-g|--ignore FILE_WILDCARD]
                             [--follow] [-p|--otp]
                             DIR_OR_FILE...
 
@@ -902,20 +904,19 @@ Description:
 Options:
   -h, --help    Print help and exit.
   -v, --verbose Verbose output.
-  -o, --output  FILE
+  -o, --output FILE
                 Write the output into the given file instead of ./tags.
   -i, --include FILE_WILDCARD
-  -g, --ignore  FILE_WILDCARD
+  -g, --ignore FILE_WILDCARD
                 Include or ignore the files/directories that match the given wildcard.
                 Read http://www.erlang.org/doc/man/filelib.html#wildcard-1 for
                 the wildcard patterns.
   --follow      Follow symbolic links
   -p, --otp     Include the currently used OTP lib_dir
 
-Example:
+Examples:
   $ vim_erlang_tags.erl
   $ vim_erlang_tags.erl .  # Same
-  $ find . -name '*.[he]rl' | vim_erlang_tags.erl -  # Equivalent to the above
   $ vim_erlang_tags.erl /path/to/project1 /path/to/project2
 ",
     io:format("~s", [Help]).
