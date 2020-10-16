@@ -798,7 +798,7 @@ add_record_or_macro_tag(EtsTags, File, Attribute, Name, InnerPattern) ->
       Scope :: scope(),
       Kind :: char().
 add_tag(EtsTags, Tag, File, TagAddress, Scope, Kind) ->
-    true = ets:insert_new(EtsTags, {{Tag, File, Scope, Kind}, TagAddress}),
+    _ = ets:insert_new(EtsTags, {{Tag, File, Scope, Kind}, TagAddress}),
     ok.
 
 %%%=============================================================================
