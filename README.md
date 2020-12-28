@@ -138,3 +138,13 @@ The few most useful tag search commands are the following:
 - `:tj ident`: jump to the definition of `ident` (function/record/macro name)
 
 For more information on those commands, see `:help tagsrch.txt`.
+
+## Contributing
+
+*   Please read the [Contributing][vim-erlang-contributing] section of the
+    vim-erlang README.
+
+*   If you modify `vim_erlang_tags.erl`, please update the tests in in the
+    vim-erlang repository.
+
+[vim-erlang-contributing]: https://github.com/vim-erlang/vim-erlang#contributing
