@@ -1,13 +1,11 @@
-vim-erlang-tags
-===============
+# vim-erlang-tags
 
-The idea
---------
+## The idea
 
 `vim-erlang-tags` **creates a tags file** (from Erlang source files), which can
 be used by Vim.
 
-When using Exuberant ctags or etags, the genereted tags will contain function
+When using Exuberant ctags or etags, the generated tags will contain function
 names, but there will be no `module:function` tags. This is a problem
 because if several functions (in different modules) have the same name, the
 text editor will not know which one to jump to.
@@ -21,28 +19,31 @@ repository also contains a Vim plugin, which modifies the following normal mode
 commands to add `:` to the `iskeyword` option for Erlang files while they are
 jumping to the location of the tag that is under the cursor:
 
-    CTRL-]
-    g<LeftMouse>
-    <C-LeftMouse>
-    g]
-    g CTRL-]
+```
+CTRL-]
+g<LeftMouse>
+<C-LeftMouse>
+g]
+g CTRL-]
+```
 
-Installation
-------------
+## Installation
 
 With [pathogen.vim](https://github.com/tpope/vim-pathogen):
 
-- `cd ~/.vim/bundle` and clone this repository.
+1.   `cd ~/.vim/bundle` and clone this repository.
 
 Manually:
 
-- Clone this repository.
-- Add the following line to your `.vimrc` (replace the path with your own):
+1.  Clone this repository.
 
-        :set runtimepath^=/path/to/vim-erlang-tags
+2.  Add the following line to your `.vimrc` (replace the path with your own):
 
-Usage
------
+    ```
+    :set runtimepath^=/path/to/vim-erlang-tags
+    ```
+
+## Usage
 
 Let's say you would like to use tags for your Erlang project.
 
@@ -52,12 +53,16 @@ First you need to generate the tags.
 
 You can do that either in the command line:
 
-    $ cd /path/to/my_erlang_project
-    $ /path/to/vim-erlang-tags/bin/vim_erlang_tags.erl
+```
+$ cd /path/to/my_erlang_project
+$ /path/to/vim-erlang-tags/bin/vim_erlang_tags.erl
+```
 
 Or within Vim by executing the following command:
 
-    :ErlangTags
+```
+:ErlangTags
+```
 
 Note that for the latter command, the current working directory will be used
 (`:help pwd` to find out more).
@@ -68,8 +73,10 @@ Note that for the latter command, the current working directory will be used
 
 Add ignore path for tags generation. Use a string or list of strings like:
 
+```
     let g:erlang_tags_ignore = 'rel'
     let g:erlang_tags_ignore = ['rel']
+```
 
 Default: doesn't exist.
 
@@ -103,16 +110,20 @@ automate the process by creating a commit/checkout hook or a crontab entry.
 
 If you use Git, creating a checkout hook is simple:
 
-    echo '#!/bin/bash' > .git/hooks/post-checkout
-    echo '/path/to/vim-erlang-tags/bin/vim_erlang_tags.erl' > .git/hooks/post-checkout
-    chmod +x .git/hooks/post-checkout
-    cp -i .git/hooks/post-checkout .git/hooks/post-commit
+```
+echo '#!/bin/bash' > .git/hooks/post-checkout
+echo '/path/to/vim-erlang-tags/bin/vim_erlang_tags.erl' > .git/hooks/post-checkout
+chmod +x .git/hooks/post-checkout
+cp -i .git/hooks/post-checkout .git/hooks/post-commit
+```
 
 ### Make Vim use the tags
 
 Add the following line to your `.vimrc`:
 
-    :set tags^=/path/to/my_erlang_project/tags
+```
+:set tags^=/path/to/my_erlang_project/tags
+```
 
 This will explicitly add the `tags` file to the list of known tags locations.
 

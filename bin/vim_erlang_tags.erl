@@ -2,6 +2,10 @@
 %% -*- tab-width: 4;erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ts=4 sw=4 ft=erlang et
 
+%%% This script creates a tags file that can be used by Vim.
+%%%
+%%% See more information in the {@link print_help/0} function.
+
 %%% Copyright 2013-2020 Csaba Hoch
 %%% Copyright 2013 Adam Rutkowski
 %%%
@@ -65,6 +69,7 @@
 %%%     {Macro, FilePath, global, $d} -> TagAddress
 %%%         mymac  ./myhrl.hrl  /^-define\s\*\<mymac\>/;"  d
 
+% 'compile' mode gives better error messages if the script throws an error.
 -mode(compile).
 
 -include_lib("kernel/include/file.hrl").
@@ -161,6 +166,8 @@
 %% @doc This function is the entry point of the script.
 %% @end
 %%------------------------------------------------------------------------------
+-spec main(Args) -> ok when
+      Args :: [string()].
 main(Args) ->
     log("Entering main. Args are ~p~n~n", [Args]),
     ParsedArgs = parse_args(#parsed_params{}, Args),
@@ -172,12 +179,15 @@ main(Args) ->
 %% @doc Read the files and generate the tags.
 %% @end
 %%------------------------------------------------------------------------------
+-spec run(Config) -> ok when
+      Config :: config().
 run(#config{help = true}) ->
     print_help();
 run(#config{explore = Explore, output = TagFile}) ->
     EtsTags = create_tags(Explore),
     ok = tags_to_file(EtsTags, TagFile),
-    ets:delete(EtsTags).
+    ets:delete(EtsTags),
+    ok.
 
 %%%=============================================================================
 %%% Parse command line arguments
@@ -884,19 +894,21 @@ log_error(Format, Data) ->
 
 %%------------------------------------------------------------------------------
 %% @doc Print the script's help.
+%%
+%% This is the last function so that it's easy to jump to it.
 %% @end
 %%------------------------------------------------------------------------------
 -spec print_help() -> ok.
 print_help() ->
     Help =
-"Usage: vim-erlang-tags.erl [-h|--help] [-v|--verbose] [-o|--output FILE]
+"Usage: vim_erlang_tags.erl [-h|--help] [-v|--verbose] [-o|--output FILE]
                             [-i|--include FILE_WILDCARD]
                             [-g|--ignore FILE_WILDCARD]
                             [--follow] [-p|--otp]
                             DIR_OR_FILE...
 
 Description:
-  vim-erlang-tags.erl creates a tags file that can be used by Vim. The
+  vim_erlang_tags.erl creates a tags file that can be used by Vim. The
   directories given as arguments are searched (recursively) for *.erl and *.hrl
   files, which will be scanned. The files given as arguments are also scanned.
   The default is to search in the current directory.
