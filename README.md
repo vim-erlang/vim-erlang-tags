@@ -1,5 +1,21 @@
 # vim-erlang-tags
 
+## Table of Contents
+
+* [The idea](#the-idea)
+* [Installation](#installation)
+* [Usage](#usage)
+    * [Generate tags](#generate-tags)
+    * [Options](#options)
+        * [`g:erlang_tags_ignore`](#gerlang_tags_ignore)
+        * [`g:erlang_tags_auto_update`](#gerlang_tags_auto_update)
+        * [`g:erlang_tags_auto_update_current`](#gerlang_tags_auto_update_current)
+        * [`g:erlang_tags_outfile`](#gerlang_tags_outfile)
+    * [Automating generating tags](#automating-generating-tags)
+    * [Make Vim use the tags](#make-vim-use-the-tags)
+    * [Using the Vim tag search commands](#using-the-vim-tag-search-commands)
+* [Contributing](#contributing)
+
 ## The idea
 
 `vim-erlang-tags` **creates a tags file** (from Erlang source files), which can
