@@ -29,19 +29,89 @@ g CTRL-]
 
 ## Installation
 
-With [pathogen.vim](https://github.com/tpope/vim-pathogen):
+<details>
+<summary>Vim's built-in package manager</summary>
 
-1.   `cd ~/.vim/bundle` and clone this repository.
+This is the recommended installation method if you use at least Vim 8 and you
+don't use another package manager.
 
-Manually:
+Information about Vim's built-in package manager: [`:help packages`].
 
-1.  Clone this repository.
+Installation steps:
 
-2.  Add the following line to your `.vimrc` (replace the path with your own):
+1.  Clone this repository (you can replace `foo` with the directory name of your
+    choice):
+
+    ```sh
+    $ git clone https://github.com/vim-erlang/vim-erlang-tags.git \
+          ~/.vim/pack/foo/start/vim-erlang-tags
+    ```
+
+2.  Restart Vim.
+</details>
+
+<details>
+<summary>Pathogen</summary>
+
+Information about Pathogen: [Pathogen repository].
+
+Installation steps:
+
+1.  Clone this repository:
 
     ```
-    :set runtimepath^=/path/to/vim-erlang-tags
+    $ git clone https://github.com/vim-erlang/vim-erlang-tags.git \
+          ~/.vim/bundle/vim-erlang-tags
     ```
+
+2.  Restart Vim.
+</details>
+
+<details>
+<summary>Vundle</summary>
+
+Information about Vundle: [Vundle repository].
+
+Installation steps:
+
+1.  Add `vim-erlang-tags` to your plugin list in `.vimrc` by inserting
+    the line that starts with `Plugin`:
+
+    ```
+    call vundle#begin()
+      [...]
+      Plugin 'vim-erlang/vim-erlang-tags'
+      [...]
+    call vundle#end()
+    ```
+
+2.  Restart Vim.
+
+3.  Run `:PluginInstall`.
+</details>
+
+<details>
+  <summary>Vim-Plug</summary>
+
+Information about Vim-Plug: [vim-plug repository].
+
+Installation steps:
+
+1.  Add `vim-erlang-tags` to your plugin list in `.vimrc` by inserting the
+    line that starts with `Plug`:
+
+    ```
+    call plug#begin()
+      [...]
+      Plug 'vim-erlang/vim-erlang-tags'
+      [...]
+    call plug#end()
+    ```
+
+2.  Restart Vim.
+
+3.  Run `:PlugInstall`.
+</details>
 
 ## Usage
 
@@ -147,4 +217,10 @@ For more information on those commands, see `:help tagsrch.txt`.
 *   If you modify `vim_erlang_tags.erl`, please update the tests in in the
     vim-erlang repository.
 
+<!-- If you modify the list below, please maintain the order with `:sort i`. -->
+
+[`:help packages`]: https://vimhelp.org/repeat.txt.html#packages
+[Pathogen repository]: https://github.com/tpope/vim-pathogen
 [vim-erlang-contributing]: https://github.com/vim-erlang/vim-erlang#contributing
+[vim-plug repository]: https://github.com/junegunn/vim-plug
+[Vundle repository]: https://github.com/VundleVim/Vundle.vim
