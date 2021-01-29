@@ -42,20 +42,20 @@ function! vim_erlang_tags#VimErlangTagsSelect(split)
     endif
     let curr_line = getline('.')
     if curr_line[col('.') - 1] =~# '[#?]'
-        normal w
+        normal! w
     endif
     let orig_isk = &isk
     set isk+=:
-    normal "_viwo
+    normal! "_viwo
     if curr_line[col('.') - 2] =~# '[#?]'
-        normal h
+        normal! h
     endif
     let &isk = orig_isk
     let module_marco_start = stridx(curr_line, "?MODULE", col('.') - 1)
     if module_marco_start == col('.') - 1
         " The selected text starts with ?MODULE, so re-select only the
         " function name.
-        normal ov"_viwo
+        normal! ov"_viwo
     endif
 endfunction
 
