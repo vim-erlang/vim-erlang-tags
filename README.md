@@ -11,6 +11,8 @@
         * [`g:erlang_tags_auto_update`](#gerlang_tags_auto_update)
         * [`g:erlang_tags_auto_update_current`](#gerlang_tags_auto_update_current)
         * [`g:erlang_tags_outfile`](#gerlang_tags_outfile)
+        * [`g:erlang_tags_follow`](#gerlang_tags_follow)
+        * [`g:erlang_tags_otp`](#gerlang_tags_otp)
     * [Automating generating tags](#automating-generating-tags)
     * [Make Vim use the tags](#make-vim-use-the-tags)
     * [Using the Vim tag search commands](#using-the-vim-tag-search-commands)
@@ -188,6 +190,18 @@ Default: doesn't exist.
 
 This option specifies the name of the generated tags file. By default, the
 output file will be `./tags`.
+
+#### `g:erlang_tags_follow`
+
+If exists and set to 1, this plugin will follow symbolic links.
+
+Default: doesn't follow symbolic links.
+
+#### `g:erlang_tags_otp`
+
+If exists and set to 1, this plugin will include the currently used OTP lib_dir.
+
+Default: doesn't include OTP lib_dir.
 
 ### Automating generating tags
 
