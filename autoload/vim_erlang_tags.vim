@@ -16,6 +16,15 @@ function! s:GetExecuteCmd()
     if exists("g:erlang_tags_outfile") && g:erlang_tags_outfile != ""
         let script_opts = script_opts . " --output " . g:erlang_tags_outfile
     endif
+
+    if exists("g:erlang_tags_follow") && g:erlang_tags_follow == 1
+        let script_opts = script_opts . " --follow"
+    endif
+
+    if exists("g:erlang_tags_otp") && g:erlang_tags_otp == 1
+        let script_opts = script_opts . " --otp"
+    endif
+
     return s:exec_script . script_opts
 endfunction
 
