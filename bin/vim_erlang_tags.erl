@@ -481,9 +481,9 @@ find_source_files(Dir) ->
                            log("Directory found: ~s~n", [FilePath]),
                            find_source_files(FilePath);
                        {ok, regular} ->
-                           case re:run(FilePath, "\\.(erl|hrl)$",
-                                       [{capture, none}]) of
-                               match ->
+                           case filename:extension(FilePath) of
+                               Ext when Ext == ".erl";
+                                        Ext == ".hrl" ->
                                    log("Source file found: ~s~n", [FilePath]),
                                    case FilePath of
                                        "./" ++ FilePathRest ->
@@ -491,7 +491,7 @@ find_source_files(Dir) ->
                                        _ ->
                                            [FilePath]
                                    end;
-                               nomatch ->
+                               _ ->
                                    []
                            end;
                        {ok, _} ->
