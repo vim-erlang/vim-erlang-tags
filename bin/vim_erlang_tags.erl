@@ -826,10 +826,47 @@ add_tag(EtsTags, Tag, File, TagAddress, Scope, Kind) ->
       TagsFile :: file:name_all().
 tags_to_file(EtsTags, TagsFile) ->
     Header = "!_TAG_FILE_SORTED\t1\t/0=unsorted, 1=sorted/\n",
-    Entries = lists:sort(
-                [tag_to_binary(Entry) || Entry <- ets:tab2list(EtsTags)]),
+    EtsTag2Binary = preproc_tag_to_binary(EtsTags),
+
+    FIsPrefixBuild = fun(FileX) ->
+                             case string:prefix(FileX, "_build") of
+                                 nomatch -> 0;
+                                 _ -> 1
+                             end
+                     end,
+    FSort = fun({{TagA, FileA, _, _}, BinA}, {{TagB, FileB, _, _}, BinB}) when TagA == TagB ->
+                     IsPrefixBuildA = FIsPrefixBuild(FileA),
+                     IsPrefixBuildB = FIsPrefixBuild(FileB),
+                     case IsPrefixBuildA == IsPrefixBuildB of
+                         true ->
+                             BinA < BinB;
+                         _ ->
+                             IsPrefixBuildA < IsPrefixBuildB
+                     end;
+               ({_KeyA, BinA}, {_KeyB, BinB}) ->
+                    BinA < BinB
+            end,
+    Entries = [Value || {_Key, Value} <- lists:sort(FSort, ets:tab2list(EtsTag2Binary))],
     file:write_file(TagsFile, [Header, Entries]),
     ok.
+
+
+preproc_tag_to_binary(EtsTags) ->
+    EtsTag2Binary = ets:new(tags_to_binary,
+                            [set,
+                             public,
+                             {write_concurrency,true},
+                             {read_concurrency,false}
+                            ]),
+    do_preproc_tag_to_binary(EtsTags, ets:first(EtsTags), EtsTag2Binary).
+
+do_preproc_tag_to_binary(_EtsTags, '$end_of_table', EtsTag2Binary) ->
+    EtsTag2Binary;
+do_preproc_tag_to_binary(EtsTags, Key, EtsTag2Binary) ->
+    [Term] = ets:lookup(EtsTags, Key),
+    _ = ets:insert_new(EtsTag2Binary, {Key, tag_to_binary(Term)}),
+    do_preproc_tag_to_binary(EtsTags, ets:next(EtsTags, Key), EtsTag2Binary).
+
 
 %%------------------------------------------------------------------------------
 %% @doc Convert one tag into a line in a tag file.
