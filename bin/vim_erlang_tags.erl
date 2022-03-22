@@ -30,6 +30,12 @@
 %%%
 %%%     {{TagName, FilePath, Scope, Kind}, TagAddress}
 %%%
+%%%     TagName :: binary(),
+%%%     FilePath :: binary(),
+%%%     Scope :: scope()
+%%%     Kind :: char()
+%%%     TagAddress :: tag_address_binary()
+%%%
 %%% Or in more readable notation:
 %%%
 %%%     {TagName, FilePath, Scope, Kind} -> TagAddress
@@ -98,6 +104,9 @@
 -define(RE_DEFINES2,
         ?COMPILE("^-\\s*(record|define)\\s*\\(?\\s*'([^ \\t']+)'")).
 
+-define(RE_BUILD,
+        ?COMPILE("\\b_build\\b")).
+
 -define(DEFAULT_PATH, ".").
 
 %%%=============================================================================
@@ -144,7 +153,10 @@
                        [cmd_line_arguments()]. % if command_type() is stateful
 %% The value of a command line parameter.
 
--type tag_address() :: iolist().
+-type tag_address_iolist() :: iolist().
+%% Same as {@link tag_address_iolist()} but as an iolist.
+
+-type tag_address_binary() :: binary().
 %% The Ex command that positions the cursor on the tag.
 %%
 %% See `:help tags-file-format' and search for `{tagaddress}'.
@@ -804,11 +816,16 @@ add_record_or_macro_tag(EtsTags, File, Attribute, Name, InnerPattern) ->
       EtsTags :: ets:tid(),
       TagName :: iodata(),
       File :: file:filename(),
-      TagAddress :: tag_address(),
+      TagAddress :: tag_address_iolist(),
       Scope :: scope(),
       Kind :: char().
 add_tag(EtsTags, TagName, File, TagAddress, Scope, Kind) ->
-    _ = ets:insert_new(EtsTags, {{TagName, File, Scope, Kind}, TagAddress}),
+    _ = ets:insert_new(EtsTags,
+                       {{iolist_to_binary(TagName),
+                         iolist_to_binary(File),
+                         Scope,
+                         Kind},
+                        iolist_to_binary(TagAddress)}),
     ok.
 
 %%%=============================================================================
@@ -826,10 +843,71 @@ add_tag(EtsTags, TagName, File, TagAddress, Scope, Kind) ->
       TagsFile :: file:name_all().
 tags_to_file(EtsTags, TagsFile) ->
     Header = "!_TAG_FILE_SORTED\t1\t/0=unsorted, 1=sorted/\n",
-    Entries = lists:sort(
-                [tag_to_binary(Entry) || Entry <- ets:tab2list(EtsTags)]),
+    TagList = ets:tab2list(EtsTags),
+    TagListSorted = lists:sort(fun should_first_tag_come_earlier/2, TagList),
+    Entries = [tag_to_binary(Tag) || Tag <- TagListSorted],
     file:write_file(TagsFile, [Header, Entries]),
     ok.
+
+%%------------------------------------------------------------------------------
+%% @doc Return whether the first tag should come earlier in the tag file than
+%%      the second tag.
+%% @end
+%%------------------------------------------------------------------------------
+-spec should_first_tag_come_earlier(Tag1, Tag2) -> Result when
+      Tag1 :: {{TagName, File, Scope, Kind}, TagAddress},
+      Tag2 :: {{TagName, File, Scope, Kind}, TagAddress},
+      TagName :: binary(),
+      File :: binary(),
+      Scope :: scope(),
+      Kind :: char(),
+      TagAddress :: tag_address_binary(),
+      Result :: boolean().
+should_first_tag_come_earlier(TagA = {{TagName, FilePathA, _, _}, _},
+                              TagB = {{TagName, FilePathB, _, _}, _}) ->
+    % The two tags have the same TagName, so if one of the tags is in a `_build'
+    % directory, that should come later.
+    %
+    % Explanation: It can happen that the same tag is present in the tag list
+    % twice: from the `app' directory and from the `_build' directory.
+    %
+    % *   On Unix: rebar3 symlinks the applications in the `app` directory into
+    %     the `_build' directory. If `vim_erlang_tags.erl' is executed with
+    %     `--follow', it follows those symlinks and the tags from the source
+    %     files are present in the tag list twice.
+    %
+    % *   On Windows: rebar3 copies the applications in the `app` directory into
+    %     the `_build' directory. The tags from the source files are present in
+    %     the tag list twice.
+    %
+    % If this happens, we want Vim to give precedence to the tags coming from
+    % `app'.
+    case {is_in_build_dir(FilePathA),
+          is_in_build_dir(FilePathB)} of
+        {false, true} ->
+            % TagA is not in _build dir; so it should be earlier in the tag file
+            % than TagB; so it should be earlier in the `Entries 'list; so it
+            % should be considered smaller by `lists:sort'; so this function
+            % should return `true'.
+            true;
+        {true, false} ->
+            % Opposite reasoning to the previous branch.
+            false;
+        _ ->
+            TagA =< TagB
+    end;
+should_first_tag_come_earlier(TagA, TagB) ->
+    TagA =< TagB.
+
+%%------------------------------------------------------------------------------
+%% @doc Return whether FilePath contains a `_build' component.
+%% @end
+%%------------------------------------------------------------------------------
+-spec is_in_build_dir(FilePath) -> Result when
+      FilePath :: binary(),
+      Result :: boolean().
+is_in_build_dir(FilePath) ->
+    re:run(FilePath, ?RE_BUILD, [{capture, none}, global]) =/= nomatch.
 
 %%------------------------------------------------------------------------------
 %% @doc Convert one tag into a line in a tag file.
@@ -837,10 +915,10 @@ tags_to_file(EtsTags, TagsFile) ->
 %%------------------------------------------------------------------------------
 -spec tag_to_binary({{TagName, File, Scope, Kind}, TagAddress}) -> Result when
       TagName :: iodata(),
-      File :: file:filename(),
+      File :: binary(),
       Scope :: scope(),
       Kind :: char(),
-      TagAddress :: tag_address(),
+      TagAddress :: tag_address_binary(),
       Result :: binary().
 tag_to_binary({{TagName, File, Scope, Kind}, TagAddress}) ->
     ScopeStr =
