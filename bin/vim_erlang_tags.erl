@@ -800,15 +800,15 @@ add_record_or_macro_tag(EtsTags, File, Attribute, Name, InnerPattern) ->
 %% @doc Add a tags to the ETS table.
 %% @end
 %%------------------------------------------------------------------------------
--spec add_tag(EtsTags, Tag, File, TagAddress, Scope, Kind) -> ok when
+-spec add_tag(EtsTags, TagName, File, TagAddress, Scope, Kind) -> ok when
       EtsTags :: ets:tid(),
-      Tag :: iodata(),
+      TagName :: iodata(),
       File :: file:filename(),
       TagAddress :: tag_address(),
       Scope :: scope(),
       Kind :: char().
-add_tag(EtsTags, Tag, File, TagAddress, Scope, Kind) ->
-    _ = ets:insert_new(EtsTags, {{Tag, File, Scope, Kind}, TagAddress}),
+add_tag(EtsTags, TagName, File, TagAddress, Scope, Kind) ->
+    _ = ets:insert_new(EtsTags, {{TagName, File, Scope, Kind}, TagAddress}),
     ok.
 
 %%%=============================================================================
@@ -835,20 +835,20 @@ tags_to_file(EtsTags, TagsFile) ->
 %% @doc Convert one tag into a line in a tag file.
 %% @end
 %%------------------------------------------------------------------------------
--spec tag_to_binary({{Tag, File, Scope, Kind}, TagAddress}) -> Result when
-      Tag :: iodata(),
+-spec tag_to_binary({{TagName, File, Scope, Kind}, TagAddress}) -> Result when
+      TagName :: iodata(),
       File :: file:filename(),
       Scope :: scope(),
       Kind :: char(),
       TagAddress :: tag_address(),
       Result :: binary().
-tag_to_binary({{Tag, File, Scope, Kind}, TagAddress}) ->
+tag_to_binary({{TagName, File, Scope, Kind}, TagAddress}) ->
     ScopeStr =
         case Scope of
             global -> "";
             local -> "\tfile:"
         end,
-    iolist_to_binary([Tag, "\t",
+    iolist_to_binary([TagName, "\t",
                       File, "\t",
                       TagAddress, ";\"\t",
                       Kind,
