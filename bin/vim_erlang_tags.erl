@@ -490,13 +490,13 @@ find_source_files(Dir) ->
                        end,
                    case get_file_type(FilePath) of
                        {ok, directory} ->
-                           log("Directory found: ~s~n", [FilePath]),
+                           log("Directory found: ~ts~n", [FilePath]),
                            find_source_files(FilePath);
                        {ok, regular} ->
                            case filename:extension(FilePath) of
                                Ext when Ext == ".erl";
                                         Ext == ".hrl" ->
-                                   log("Source file found: ~s~n", [FilePath]),
+                                   log("Source file found: ~ts~n", [FilePath]),
                                    case FilePath of
                                        "./" ++ FilePathRest ->
                                            [FilePathRest];
@@ -509,13 +509,13 @@ find_source_files(Dir) ->
                        {ok, _} ->
                            [];
                        {error, Reason} ->
-                           log_error("Cannot find file or directory '~s': ~p.~n",
+                           log_error("Cannot find file or directory '~ts': ~p.~n",
                                      [FilePath, Reason]),
                            []
                    end
                end || FileName <- lists:sort(FileNames)]);
         {error, Reason} ->
-            log_error("Cannot read directory '~s': ~p.~n", [Dir, Reason]),
+            log_error("Cannot read directory '~ts': ~p.~n", [Dir, Reason]),
             []
     end.
 
@@ -548,7 +548,7 @@ get_file_type(FileName) ->
       Explore :: [file:filename()],
       Result :: ets:tid().
 create_tags(Explore) ->
-    log("In create_tags, To explore: ~p~n", [Explore]),
+    log("In create_tags, To explore: ~tp~n", [Explore]),
     EtsTags = ets:new(tags,
                       [set,
                        public,
@@ -608,7 +608,7 @@ process_filenames([File|OtherFiles], EtsTags, Processes) ->
       Verbose :: boolean().
 add_tags_from_file(File, EtsTags, Verbose) ->
     put(verbose, Verbose),
-    log("~nProcessing file: ~s~n", [File]),
+    log("~nProcessing file: ~ts~n", [File]),
 
     BaseName = filename:basename(File), % e.g. "mymod.erl"
     ModName = filename:rootname(BaseName), % e.g. "mymod"
@@ -618,7 +618,7 @@ add_tags_from_file(File, EtsTags, Verbose) ->
         {ok, Contents} ->
             ok = scan_tags(Contents, {EtsTags, File, ModName});
         Err ->
-            log_error("File ~s not readable: ~p~n", [File, Err])
+            log_error("File ~ts not readable: ~p~n", [File, Err])
     end.
 
 %%------------------------------------------------------------------------------
@@ -822,7 +822,7 @@ add_record_or_macro_tag(EtsTags, File, Attribute, Name, InnerPattern) ->
 add_tag(EtsTags, TagName, File, TagAddress, Scope, Kind) ->
     _ = ets:insert_new(EtsTags,
                        {{iolist_to_binary(TagName),
-                         iolist_to_binary(File),
+                         unicode:characters_to_binary(File),
                          Scope,
                          Kind},
                         iolist_to_binary(TagAddress)}),
