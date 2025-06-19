@@ -724,12 +724,12 @@ add_func_tags(EtsTags, File, ModName, FuncName) ->
 
     % Global entry:
     % mymod:f <tab> ./mymod.erl <tab> /^f\>/
-    add_tag(EtsTags, [ModName, ":", FuncName], File, ["/^", FuncName, "\\>/"],
+    add_tag(EtsTags, [ModName, ":", FuncName], File, ["/^", FuncName, "(/"],
             global, $f),
 
     % Static (or local) entry:
     % f <tab> ./mymod.erl <tab> /^f\>/ <space><space> ;" <tab> file:
-    add_tag(EtsTags, FuncName, File, ["/^", FuncName, "\\>/"], local, $f).
+    add_tag(EtsTags, FuncName, File, ["/^", FuncName, "(/"], local, $f).
 
 %%------------------------------------------------------------------------------
 %% @doc Add a tag about a type definition.
